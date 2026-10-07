@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #fef2e8;
+  --color-primary-100: #fde5d1;
+  --color-primary-200: #fbcba3;
+  --color-primary-300: #f9b175;
+  --color-primary-400: #f79747;
+  --color-primary-500: #f57d19;
+  --color-primary-600: #e06b0f;
+  --color-primary-700: #c45a0c;
+  --color-primary-800: #a84a09;
+  --color-primary-900: #8c3a07;
+
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+}
+button{
+  cursor: pointer;
+}
+
+body {
+  background-color: #f5f5f5;
+  color: #333333;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* ---------- Lead status pill colors ---------- */
+.status-new { background-color: #e6f0fb; color: #2a6ba8; border-color: #c7ddf5; }
+.status-new .status-dot { background-color: #2a6ba8; }
+
+.status-active { background-color: #fef7e0; color: #b68b40; border-color: #f3dfa0; }
+.status-active .status-dot { background-color: #b68b40; }
+
+.status-contacted { background-color: #e0f2fe; color: #0284c7; border-color: #bae3fd; }
+.status-contacted .status-dot { background-color: #0284c7; }
+
+.status-interested { background-color: #f3e8ff; color: #7a3aa8; border-color: #e0c8fa; }
+.status-interested .status-dot { background-color: #7a3aa8; }
+
+.status-site-visit-scheduled { background-color: #fef3c7; color: #b45309; border-color: #fbe19d; }
+.status-site-visit-scheduled .status-dot { background-color: #b45309; }
+
+.status-site-visit-completed { background-color: #dcfce7; color: #15803d; border-color: #b8e6c4; }
+.status-site-visit-completed .status-dot { background-color: #15803d; }
+
+.status-lost { background-color: #fde8e8; color: #c0392b; border-color: #f7c6c2; }
+.status-lost .status-dot { background-color: #c0392b; }
+
+.status-converted { background-color: #e8f5e6; color: #2d7a3a; border-color: #c3e7bd; }
+.status-converted .status-dot { background-color: #2d7a3a; }
+
+.status-unknown { background-color: #f1f3f0; color: #5a6b5a; border-color: #dbe2d9; }
+.status-unknown .status-dot { background-color: #5a6b5a; }
+.status-follow-up { background-color: #f3e8ff; color: #7a3aa8; border-color: #e0c8fa; }
+.status-follow-up .status-dot { background-color: #7a3aa8; }
+/* ---------- Responsive safety nets ---------- */
+
+/* Prevent iOS zoom on input focus (font-size < 16px triggers zoom) */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Better mobile tap targets */
+@media (max-width: 640px) {
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Prevent horizontal overflow from long words/codes */
+code,
+.truncate-safe {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Smooth scroll for tab strips */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.overflow-x-auto::-webkit-scrollbar {
+  display: none;
+}
+
+/* Modal body scroll lock helper */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* Fluid images */
+img {
+  max-width: 100%;
+  height: auto;
+}

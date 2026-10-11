@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, Phone, MapPin, MessageSquare,
+  ArrowLeft, Phone, MessageSquare,
   Star, Building2, Image as ImageIcon,
   Bell, Calendar,
 } from 'lucide-react';
@@ -196,38 +196,39 @@ export default function LeadDetailPage() {
         >
           <ArrowLeft className="w-4 h-4" /> Back to Leads
         </button>
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a2e1a] break-words">
-          {lead.name || 'Lead'}
-        </h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a2e1a] break-words">
+            {lead.name || 'Lead'}
+          </h1>
+          <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${
+            lead.source === 'manual'
+              ? 'bg-[#fef7e0] text-[#b68b40]'
+              : 'bg-[#e8f5e6] text-[#2d7a3a]'
+          }`}>
+            {lead.source === 'manual' ? 'Manual' : 'WhatsApp'}
+          </span>
+        </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-sm text-[#4f6b4f]">
           <span className="flex items-center gap-1.5">
             <Phone className="w-3.5 h-3.5" /> {lead.phone}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5" /> {lead.city || '—'}
-            {lead.area ? `, ${lead.area}` : ''}
           </span>
         </div>
       </div>
 
       {/* Info card */}
       <div className="bg-white rounded-2xl border border-[#e8f0e6] p-4 sm:p-5 shadow-sm mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           <Field label="Name" value={lead.name} />
           <Field label="Contact Number" value={lead.phone} />
-          <Field
-            label="City / Area"
-            value={`${lead.city || '—'}${lead.area ? ' / ' + lead.area : ''}`}
-          />
           <Field label="Assigned To">
-  {lead.assignedTo ? (
-    <p className="text-sm font-medium text-[#1a2e1a] break-words">
-      {lead.assignedTo}
-    </p>
-  ) : (
-    <p className="text-sm text-[#6a7f6a] italic">Unassigned</p>
-  )}
-</Field>
+            {lead.assignedTo ? (
+              <p className="text-sm font-medium text-[#1a2e1a] break-words">
+                {lead.assignedTo}
+              </p>
+            ) : (
+              <p className="text-sm text-[#6a7f6a] italic">Unassigned</p>
+            )}
+          </Field>
           <Field label="Current Status">
             <select
               value={lead.currentStatus || 'new'}
@@ -275,7 +276,10 @@ export default function LeadDetailPage() {
               <EnquiryTab enquiries={subData.enquiry} />
             )}
             {activeTab === 'interested' && (
-              <InterestedTab interests={subData.interested} />
+              <InterestedTab
+                interests={subData.interested}
+                selectedProperty={lead.interested}
+              />
             )}
             {activeTab === 'conversation' && (
               <ConversationTab conversation={subData.conversation} />
@@ -381,20 +385,36 @@ function EnquiryTab({ enquiries }) {
   );
 }
 
-function InterestedTab({ interests }) {
+function InterestedTab({ interests, selectedProperty }) {
   const list = Array.isArray(interests) ? interests : [];
-  if (list.length === 0) {
+  const selectedPropertyId =
+    typeof selectedProperty === 'object' && selectedProperty !== null
+      ? selectedProperty._id
+      : selectedProperty;
+  const hasSelectedProperty = selectedProperty &&
+    !list.some((interest) => {
+      const propertyId =
+        typeof interest.property === 'object' && interest.property !== null
+          ? interest.property._id
+          : interest.property;
+      return String(propertyId) === String(selectedPropertyId);
+    });
+  const displayedInterests = hasSelectedProperty
+    ? [{ _id: `selected-${selectedPropertyId}`, property: selectedProperty, manuallySelected: true }, ...list]
+    : list;
+  if (displayedInterests.length === 0) {
     return <Empty icon={Star} text="No interested properties yet" />;
   }
 
   return (
     <div className="space-y-3">
-      {list.map((it, idx) => {
+      {displayedInterests.map((it, idx) => {
         const p =
           typeof it.property === 'object' && it.property !== null
             ? it.property
             : null;
         const publicTitle = p?.title || it.propertyTitle || 'Property';
+        const propertyId = p?.propertyId || it.propertySnapshot?.propertyId || '';
         const internalName =
           p?.internalName || it.propertySnapshot?.internalName || '';
         const city = p?.city || it.propertySnapshot?.city || '';
@@ -427,6 +447,10 @@ function InterestedTab({ interests }) {
                 </span>
               </div>
 
+              {propertyId && (
+                <p className="text-xs text-[#6a7f6a] mb-1">{propertyId}</p>
+              )}
+
               {internalName && (
                 <p className="text-xs text-[#7a3aa8] bg-[#f3e8ff] inline-flex items-center gap-1 px-2 py-0.5 rounded mb-1">
                   <span className="font-medium">Private:</span> {internalName}
@@ -439,14 +463,16 @@ function InterestedTab({ interests }) {
                 {area}
               </p>
               <p className="text-xs text-[#6a7f6a] mt-1">
-                Expressed interest on{' '}
+                {it.manuallySelected
+                  ? 'Selected for this lead'
+                  : <>Expressed interest on{' '}
                 {it.expressedAt
                   ? new Date(it.expressedAt).toLocaleDateString('en-IN', {
                       month: 'short',
                       day: 'numeric',
                       year: 'numeric',
                     })
-                  : '—'}
+                  : '—'}</>}
               </p>
             </div>
 

@@ -39,12 +39,144 @@ const PROPERTY_CATEGORIES = [
   { value: "", label: "— Select —" },
   { value: "purchase", label: "Purchase" },
   { value: "rent_lease", label: "Rent / Lease" },
-  { value: "rent_out", label: "Rent Out" },
 ];
 
-const LEAD_TYPES = [
-  { value: "seeker", label: "Seeker" },
-  { value: "lister", label: "Lister" },
+const PROPERTY_CLASS_OPTIONS = [
+  { value: "residential", label: "Residential" },
+  { value: "commercial", label: "Commercial" },
+];
+
+const PROPERTY_SUBTYPE_OPTIONS = {
+  residential_buy: [
+    ["apartment", "Apartment / Flat"],
+    ["house", "Independent House"],
+    ["villa", "Villa"],
+    ["builder_floor", "Builder Floor"],
+    ["studio", "Studio Apartment"],
+    ["penthouse", "Penthouse"],
+    ["farmhouse", "Farmhouse"],
+    ["plot", "Land / Plot"],
+  ],
+  commercial_buy: [
+    ["office", "Office Space"],
+    ["shop", "Shop / Retail"],
+    ["showroom", "Showroom"],
+    ["warehouse", "Warehouse / Godown"],
+    ["industrial", "Industrial Land / Factory"],
+    ["plot", "Land / Plot"],
+    ["coworking", "Co-working Space"],
+  ],
+  residential_rent: [
+    ["apartment", "Apartment / Flat"],
+    ["house", "Independent House"],
+    ["villa", "Villa"],
+    ["builder_floor", "Builder Floor"],
+    ["bunglow", "Bunglow"],
+    ["pg", "PG (Paying Guest)"],
+    ["farmhouse", "Farmhouse"],
+  ],
+  commercial_rent: [
+    ["office", "Office Space"],
+    ["shop", "Shop / Retail"],
+    ["showroom", "Showroom"],
+    ["warehouse", "Warehouse / Godown"],
+    ["industrial", "Industrial Land / Factory"],
+    ["coworking", "Co-working Space"],
+  ],
+  residential_rent_out: [
+    ["apartment", "Apartment / Flat"],
+    ["house", "Independent House"],
+    ["villa", "Villa"],
+    ["builder_floor", "Builder Floor"],
+    ["pg", "PG"],
+    ["farmhouse", "Farmhouse"],
+  ],
+  commercial_rent_out: [
+    ["office", "Office Space"],
+    ["shop", "Shop / Retail"],
+    ["showroom", "Showroom"],
+    ["warehouse", "Warehouse"],
+    ["coworking", "Co-working Space"],
+    ["factory", "Factory"],
+  ],
+};
+
+const BUY_CONFIGURATIONS = [
+  ["1bhk", "1 BHK"],
+  ["2bhk", "2 BHK"],
+  ["3bhk", "3 BHK"],
+  ["4bhk", "4 BHK"],
+  ["5bhk_plus", "5+ BHK"],
+  ["duplex", "Duplex"],
+];
+const RENT_CONFIGURATIONS = [
+  ["1bhk", "1 BHK"],
+  ["2bhk", "2 BHK"],
+  ["3bhk", "3 BHK"],
+  ["4bhk", "4+ BHK"],
+];
+const BUY_BUDGETS = [
+  ["30L_50L", "₹30L – ₹50L"],
+  ["50L_75L", "₹50L – ₹75L"],
+  ["75L_1Cr", "₹75L – ₹1Cr"],
+  ["above_1Cr", "Above ₹1Cr"],
+];
+const RENT_BUDGETS = [
+  ["15k_25k", "💵 ₹15,000-₹25,000"],
+  ["25k_35k", "💵 ₹25,000-₹35,000"],
+  ["35k_50k", "💵 ₹35,000-₹50,000"],
+  ["above_50k", "💎 Above ₹50,000"],
+];
+const RENT_BUDGET_RANGES = {
+  "15k_25k": "mid",
+  "25k_35k": "high",
+  "35k_50k": "luxury",
+  above_50k: "luxury",
+};
+const RENT_OUT_BUDGETS = [
+  ["low", "Below ₹10,000"],
+  ["mid", "₹10,000–₹20,000"],
+  ["high", "₹20,000–₹40,000"],
+  ["luxury", "Above ₹40,000"],
+];
+const BUY_TIMELINES = [
+  ["immediately", "🚀 Immediately"],
+  ["within_1_month", "📆 Within 1 Month"],
+  ["within_3_months", "🗓️ Within 3 Months"],
+  ["just_exploring", "👀 Just Exploring"],
+];
+const RENT_TIMELINES = [
+  ["immediately", "🚀 Immediately"],
+  ["within_15_days", "📆 Within 15 Days"],
+  ["within_1_month", "🗓️ Within 1 Month"],
+  ["just_exploring", "👀 Just Exploring"],
+];
+const RENT_OUT_AVAILABILITY = [
+  ["available_now", "🚀 Available Now"],
+  ["within_15_days", "📆 Within 15 Days"],
+  ["next_month", "🗓️ Next Month"],
+];
+const BUYING_PLANS = [
+  ["buy_directly", "Buy Directly"],
+  ["sell_then_buy", "Sell Then Buy"],
+];
+const FURNISHING_OPTIONS = [
+  ["unfurnished", "Unfurnished"],
+  ["semi_furnished", "Semi-Furnished"],
+  ["fully_furnished", "Fully Furnished"],
+];
+const COMMERCIAL_SETUP_OPTIONS = [
+  ["bare_shell", "Bare Shell"],
+  ["unfurnished", "Unfurnished"],
+  ["semi_furnished", "Semi-Furnished"],
+  ["fully_furnished", "Fully Furnished"],
+];
+const SPACE_SIZE_OPTIONS = [
+  ["upto_500", "Up to 500 Sq.Ft."],
+  ["500_1000", "500–1,000 Sq.Ft."],
+  ["1000_2000", "1,000–2,000 Sq.Ft."],
+  ["2000_5000", "2,000–5,000 Sq.Ft."],
+  ["above_5000", "Above 5,000 Sq.Ft."],
 ];
 
 export default function LeadsPage() {
@@ -71,22 +203,78 @@ export default function LeadsPage() {
   // Add Lead modal
   const [addOpen, setAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [areaOptions, setAreaOptions] = useState([]);
+  const [matchingProperties, setMatchingProperties] = useState([]);
+  const [propertiesLoading, setPropertiesLoading] = useState(false);
+  const [assigneeOptions, setAssigneeOptions] = useState([]);
   const [form, setForm] = useState({
     name: "",
     phone: "",
-    email: "",
-    city: "",
+    phoneNumber: "",
+    city: "Surat",
     area: "",
     leadType: "seeker",
+    preferredLanguage: "en",
     propertyCategory: "",
+    purchaseType: "",
+    propertyType: "",
+    propertySubType: "",
+    rentTypeLabel: "",
+    configuration: "",
     budgetRange: "",
     rentBudgetLabel: "",
     timeline: "",
     furnishing: "",
+    investmentType: "",
+    siteVisit: "",
+    interested: "",
+    spaceSize: "",
     currentStatus: "new",
     assignedTo: "",
-    notes: "",
   });
+  const propertyClass = form.purchaseType.startsWith("commercial")
+    ? "commercial"
+    : "residential";
+  const subtypeOptions = PROPERTY_SUBTYPE_OPTIONS[
+    `${propertyClass}_${form.propertyCategory === "purchase" ? "buy" : form.propertyCategory === "rent_out" ? "rent_out" : "rent"}`
+  ] || [];
+  const configurationOptions = form.propertyType === "commercial"
+    ? [["commercial", "Commercial"]]
+    : form.leadType === "lister"
+      ? form.configuration
+        ? [[form.configuration, form.configuration.toUpperCase().replace("BHK", " BHK")]]
+        : []
+      : form.purchaseType.endsWith("_rent")
+        ? RENT_CONFIGURATIONS
+        : BUY_CONFIGURATIONS;
+  const isRentLead = form.purchaseType.endsWith("_rent");
+  const selectedRentBudget = RENT_BUDGETS.find(([, label]) => label === form.rentBudgetLabel)?.[0] || "";
+  const budgetOptions = form.propertyCategory === "rent_out"
+    ? RENT_OUT_BUDGETS
+    : isRentLead
+      ? RENT_BUDGETS
+      : form.purchaseType.endsWith("_buy")
+        ? BUY_BUDGETS
+        : [];
+  const timelineOptions = form.propertyCategory === "rent_out"
+    ? RENT_OUT_AVAILABILITY
+    : form.purchaseType.endsWith("_rent")
+      ? RENT_TIMELINES
+      : BUY_TIMELINES;
+  const furnishingOptions = form.propertyCategory === "rent_out" || form.purchaseType === "commercial_rent"
+      ? (form.leadType === "lister" ? FURNISHING_OPTIONS : COMMERCIAL_SETUP_OPTIONS)
+    : FURNISHING_OPTIONS;
+  const propertyCriteriaReady = Boolean(
+    form.area &&
+    form.purchaseType &&
+    form.propertySubType &&
+    (form.propertySubType === "plot" || !configurationOptions.length || form.configuration) &&
+    form.budgetRange &&
+    form.timeline &&
+    (!form.purchaseType.endsWith("_rent") || form.furnishing) &&
+    (!form.purchaseType.endsWith("_buy") || form.investmentType) &&
+    (form.propertyType !== "commercial" || form.spaceSize)
+  );
 
   const fetchStats = async () => {
     try {
@@ -137,6 +325,119 @@ export default function LeadsPage() {
   useEffect(() => {
     fetchLeads(); /* eslint-disable-next-line */
   }, [pagination.page, filterStatus, filterCity]);
+
+  useEffect(() => {
+    if (!addOpen) return;
+
+    let cancelled = false;
+    const loadManualLeadOptions = async () => {
+      try {
+        const [propertyResponse, teamResponse] = await Promise.all([
+          fetch('/api/properties?city=Surat&limit=200'),
+          fetch('/api/team-members?role=channel_partner&active=true&limit=500'),
+        ]);
+        const [propertyJson, teamJson] = await Promise.all([
+          propertyResponse.json(),
+          teamResponse.json(),
+        ]);
+        if (!propertyResponse.ok || !propertyJson.success) {
+          throw new Error(propertyJson.error || 'Could not load Surat areas');
+        }
+        if (!teamResponse.ok || !teamJson.success) {
+          throw new Error(teamJson.error || 'Could not load lead assignees');
+        }
+        if (cancelled) return;
+        setAreaOptions(
+          [...new Set((propertyJson.data || []).map((property) => property.area).filter(Boolean))]
+            .sort((a, b) => a.localeCompare(b))
+        );
+        setAssigneeOptions((teamJson.data || []).map((member) => member.name).filter(Boolean));
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to load manual lead options:', error);
+          toast.error(error.message || 'Failed to load lead options');
+        }
+      }
+    };
+
+    loadManualLeadOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, [addOpen]);
+
+  useEffect(() => {
+    setForm((previous) => previous.interested
+      ? { ...previous, interested: "" }
+      : previous);
+    setMatchingProperties([]);
+    if (!addOpen || !propertyCriteriaReady) {
+      setPropertiesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadMatchingProperties = async () => {
+      setPropertiesLoading(true);
+      try {
+        const params = new URLSearchParams({
+          city: "Surat",
+          area: form.area,
+          category: form.purchaseType,
+          propertySubType: form.propertySubType,
+          limit: "200",
+        });
+        if (form.configuration) params.set("configuration", form.configuration);
+
+        const firstResponse = await fetch(`/api/properties?${params}`);
+        const firstJson = await firstResponse.json();
+        if (!firstResponse.ok || !firstJson.success) {
+          throw new Error(firstJson.error || "Could not load matching properties");
+        }
+
+        const pages = firstJson.pagination?.pages || 1;
+        const remainingPages = await Promise.all(
+          Array.from({ length: Math.max(0, pages - 1) }, (_, index) => {
+            const pageParams = new URLSearchParams(params);
+            pageParams.set("page", String(index + 2));
+            return fetch(`/api/properties?${pageParams}`).then(async (response) => {
+              const json = await response.json();
+              if (!response.ok || !json.success) {
+                throw new Error(json.error || "Could not load matching properties");
+              }
+              return json.data || [];
+            });
+          })
+        );
+
+        if (!cancelled) {
+          setMatchingProperties([
+            ...(firstJson.data || []),
+            ...remainingPages.flat(),
+          ]);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to load matching properties:", error);
+          toast.error(error.message || "Failed to load matching properties");
+        }
+      } finally {
+        if (!cancelled) setPropertiesLoading(false);
+      }
+    };
+
+    loadMatchingProperties();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    addOpen,
+    propertyCriteriaReady,
+    form.area,
+    form.purchaseType,
+    form.propertySubType,
+    form.configuration,
+  ]);
 
   const handleDelete = async (id) => {
     if (!confirm("Delete this lead?")) return;
@@ -233,18 +534,27 @@ export default function LeadsPage() {
     setForm({
       name: "",
       phone: "",
-      email: "",
-      city: "",
+      phoneNumber: "",
+      city: "Surat",
       area: "",
       leadType: "seeker",
+      preferredLanguage: "en",
       propertyCategory: "",
+      purchaseType: "",
+      propertyType: "",
+      propertySubType: "",
+      rentTypeLabel: "",
+      configuration: "",
       budgetRange: "",
       rentBudgetLabel: "",
       timeline: "",
       furnishing: "",
+      investmentType: "",
+      siteVisit: "",
+      interested: "",
+      spaceSize: "",
       currentStatus: "new",
       assignedTo: "",
-      notes: "",
     });
     setAddOpen(true);
   };
@@ -256,6 +566,24 @@ export default function LeadsPage() {
   const handleAddSave = async () => {
     if (!form.phone.trim()) return toast.error("Phone is required");
     if (!form.name.trim()) return toast.error("Name is required");
+    if (!form.propertyCategory) return toast.error("Select a property category");
+    if (!form.purchaseType) return toast.error("Select residential or commercial");
+    if (!form.propertySubType) return toast.error("Select a property subtype");
+    if (!form.budgetRange) return toast.error("Select a budget");
+    if (!form.timeline) return toast.error("Select a timeline");
+    if (form.leadType === "seeker" && form.propertyType !== "commercial" && form.propertySubType !== "plot" && !form.configuration) {
+      return toast.error("Select a configuration / BHK");
+    }
+    if (form.propertyType === "commercial" && !form.spaceSize) {
+      return toast.error("Select a commercial space size");
+    }
+    if (form.purchaseType.endsWith("_rent") && !form.furnishing) {
+      return toast.error("Select a furnishing / setup preference");
+    }
+    if (form.purchaseType.endsWith("_buy") && !form.investmentType) {
+      return toast.error("Select a buying plan");
+    }
+    if (areaOptions.length && !form.area) return toast.error("Select an area");
 
     setSaving(true);
     try {
@@ -264,6 +592,8 @@ export default function LeadsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          city: "Surat",
+          phoneNumber: form.phoneNumber.trim() || form.phone.trim(),
           source: "manual",
         }),
       });
@@ -282,6 +612,104 @@ export default function LeadsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const setPropertyCategory = (propertyCategory) => {
+    setForm((previous) => ({
+      ...previous,
+      propertyCategory,
+      leadType: propertyCategory === 'rent_out' ? 'lister' : 'seeker',
+      purchaseType: '',
+      propertyType: '',
+      propertySubType: '',
+      rentTypeLabel: '',
+      configuration: '',
+      budgetRange: '',
+      rentBudgetLabel: '',
+      timeline: '',
+      furnishing: '',
+      investmentType: '',
+      spaceSize: '',
+      listingDraft: {},
+    }));
+  };
+
+  const setPurchaseType = (propertyClass) => {
+    if (!propertyClass) {
+      setForm((previous) => ({
+        ...previous,
+        purchaseType: '',
+        propertyType: '',
+        propertySubType: '',
+        rentTypeLabel: '',
+        configuration: '',
+      }));
+      return;
+    }
+
+    const isLister = form.propertyCategory === 'rent_out';
+    const suffix = form.propertyCategory === 'purchase' ? '_buy' : '_rent';
+    const purchaseType = `${propertyClass}${suffix}`;
+    setForm((previous) => ({
+      ...previous,
+      purchaseType,
+      propertyType: propertyClass === 'commercial'
+        ? 'commercial'
+        : (purchaseType.endsWith('_rent') ? 'rent' : 'buy'),
+      propertySubType: '',
+      rentTypeLabel: purchaseType.endsWith('_rent')
+        ? (propertyClass === 'commercial' ? 'Commercial' : 'Residential')
+        : '',
+      configuration: propertyClass === 'commercial' ? 'commercial' : '',
+      budgetRange: '',
+      rentBudgetLabel: '',
+      timeline: '',
+      furnishing: '',
+      spaceSize: '',
+      investmentType: '',
+      listingDraft: isLister ? {} : previous.listingDraft,
+    }));
+  };
+
+  const setPropertySubtype = (propertySubType) => {
+    const isLister = form.propertyCategory === 'rent_out';
+    const isCommercial = form.purchaseType.startsWith('commercial_');
+    let configuration = '';
+    if (isCommercial) configuration = 'commercial';
+    else if (isLister) {
+      configuration = ['pg', 'studio'].includes(propertySubType)
+        ? '1bhk'
+        : ['villa', 'farmhouse', 'penthouse'].includes(propertySubType)
+          ? '4bhk'
+          : '2bhk';
+    } else if (propertySubType === 'plot' && form.purchaseType === 'residential_buy') {
+      configuration = '';
+    }
+
+    setForm((previous) => ({
+      ...previous,
+      propertySubType,
+      configuration,
+      budgetRange: '',
+      rentBudgetLabel: '',
+    }));
+  };
+
+  const setBudget = (value) => {
+    if (form.propertyCategory === 'rent_out') {
+      setForm((previous) => ({ ...previous, budgetRange: value, rentBudgetLabel: '' }));
+      return;
+    }
+    if (form.purchaseType.endsWith('_rent')) {
+      const labels = Object.fromEntries(RENT_BUDGETS);
+      setForm((previous) => ({
+        ...previous,
+        budgetRange: RENT_BUDGET_RANGES[value] || '',
+        rentBudgetLabel: labels[value] || '',
+      }));
+      return;
+    }
+    setForm((previous) => ({ ...previous, budgetRange: value, rentBudgetLabel: '' }));
   };
 
   const filteredLeads = leads.filter((lead) => {
@@ -462,12 +890,12 @@ export default function LeadsPage() {
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-[#e8f0e6] overflow-hidden shadow-sm">
-        <div className="responsive-table-wrapper overflow-x-auto">
-          <table className="responsive-table w-full min-w-[1100px]">
+        <div className="responsive-table-wrapper overflow-hidden">
+          <table className="responsive-table w-full table-fixed">
             <thead>
               <tr className="bg-[#fafffa]">
                 <Th>Lead Name</Th>
-                <Th>City / Area</Th>
+                <Th hidden>City / Area</Th>
                 <Th>Budget</Th>
                 <Th>Property Interest</Th>
                 <Th>Source</Th>
@@ -479,7 +907,7 @@ export default function LeadsPage() {
             <tbody>
               {loading ? (
                 <tr className="border-t border-[#eef5ec]">
-                  <td colSpan={8} className="text-center py-12">
+                  <td colSpan={7} className="text-center py-12">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-8 h-8 border-3 border-[#2d7a3a] border-t-transparent rounded-full animate-spin" />
                       <p className="text-sm text-[#6a7f6a]">Loading leads...</p>
@@ -489,7 +917,7 @@ export default function LeadsPage() {
               ) : filteredLeads.length === 0 ? (
                 <tr className="border-t border-[#eef5ec]">
                   <td
-                    colSpan={8}
+                    colSpan={7}
                     className="text-center py-12 text-[#6a7f6a] text-sm"
                   >
                     <FolderOpen className="w-5 h-5 inline-block mr-2 mb-0.5" />
@@ -537,7 +965,7 @@ export default function LeadsPage() {
                         </p>
                       </td>
 
-                      <td className="px-5 py-3" data-label="City / Area">
+                      <td className="hidden px-5 py-3" data-label="City / Area">
                         <p className="text-sm text-[#4f6b4f] flex items-center gap-1 justify-start text-left">
                           <MapPin className="w-3 h-3 text-[#6a7f6a] shrink-0" />{" "}
                           {lead.city || "—"}
@@ -549,17 +977,23 @@ export default function LeadsPage() {
                         )}
                       </td>
 
-                      <td className="px-5 py-3" data-label="Budget">
-                        <p className="text-sm text-[#4f6b4f] flex items-center gap-1 justify-end">
+                      <td className="min-w-0 px-3 py-3" data-label="Budget">
+                        <p
+                          className="text-sm text-[#4f6b4f] text-left truncate"
+                          title={lead.rentBudgetLabel || lead.budgetRange || "—"}
+                        >
                           {lead.rentBudgetLabel || lead.budgetRange || "—"}
                         </p>
                       </td>
 
-                      <td className="px-5 py-3" data-label="Property Interest">
+                      <td className="min-w-0 px-3 py-3" data-label="Property Interest">
                         {interested ? (
-                          <div className="flex items-center gap-1.5 justify-end">
+                          <div className="flex min-w-0 items-center gap-1.5">
                             <Star className="w-3.5 h-3.5 text-[#f59e0b] fill-[#f59e0b]" />
-                            <span className="text-sm text-[#1a2e1a] truncate max-w-[180px]">
+                            <span
+                              className="min-w-0 max-w-full text-sm text-[#1a2e1a] truncate"
+                              title={interested.title}
+                            >
                               {interested.title}
                             </span>
                           </div>
@@ -597,7 +1031,7 @@ export default function LeadsPage() {
                             status-pill
                             inline-flex items-center justify-center
                             gap-1.5
-                            min-w-[110px]
+                            min-w-[90px]
                             h-7
                             px-3
                             text-xs
@@ -732,63 +1166,29 @@ export default function LeadsPage() {
                     className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
                   />
                 </Field>
-                <Field label="Email">
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, email: e.target.value }))
-                    }
-                    placeholder="optional"
-                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
-                  />
-                </Field>
-                <Field label="Lead Type">
+                <Field label="City">
                   <select
-                    value={form.leadType}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, leadType: e.target.value }))
-                    }
-                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
+                    value="Surat"
+                    disabled
+                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-gray-100 text-gray-600"
                   >
-                    {LEAD_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
+                    <option value="Surat">Surat</option>
                   </select>
                 </Field>
-                <Field label="City">
-                  <input
-                    type="text"
-                    value={form.city}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, city: e.target.value }))
-                    }
-                    placeholder="e.g., Indore"
-                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
-                  />
-                </Field>
                 <Field label="Area">
-                  <input
-                    type="text"
+                  <select
                     value={form.area}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, area: e.target.value }))
-                    }
-                    placeholder="e.g., Vijay Nagar"
+                    onChange={(e) => setForm((p) => ({ ...p, area: e.target.value }))}
                     className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
-                  />
+                  >
+                    <option value="">Select area (optional)</option>
+                    {areaOptions.map((area) => <option key={area} value={area}>{area}</option>)}
+                  </select>
                 </Field>
                 <Field label="Property Category">
                   <select
                     value={form.propertyCategory}
-                    onChange={(e) =>
-                      setForm((p) => ({
-                        ...p,
-                        propertyCategory: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setPropertyCategory(e.target.value)}
                     className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
                   >
                     {PROPERTY_CATEGORIES.map((c) => (
@@ -798,63 +1198,127 @@ export default function LeadsPage() {
                     ))}
                   </select>
                 </Field>
+                {form.propertyCategory && (
+                <Field label={form.propertyCategory === "purchase" ? "Purchase Type" : "Property Category"}>
+                  <select
+                    value={form.purchaseType ? propertyClass : ""}
+                    onChange={(e) => setPurchaseType(e.target.value)}
+                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
+                  >
+                    <option value="">Select property class</option>
+                    {PROPERTY_CLASS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </Field>
+                )}
+                {form.purchaseType && (
+                <Field label="Property Subtype">
+                  <select
+                    value={form.propertySubType}
+                    onChange={(e) => setPropertySubtype(e.target.value)}
+                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
+                  >
+                    <option value="">Select subtype</option>
+                    {subtypeOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </Field>
+                )}
+                {configurationOptions.length > 0 && form.propertySubType !== "plot" && (
+                <Field label="Configuration / BHK">
+                  <select
+                    value={form.configuration}
+                    onChange={(e) => setForm((p) => ({ ...p, configuration: e.target.value }))}
+                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
+                  >
+                    {form.leadType === "lister" ? null : <option value="">Select configuration</option>}
+                    {configurationOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </Field>
+                )}
+                {form.purchaseType && form.propertySubType && (
                 <Field label="Budget">
-                  <input
-                    type="text"
-                    value={form.budgetRange}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, budgetRange: e.target.value }))
-                    }
-                    placeholder="e.g., 50-75 L"
+                  <select
+                    value={isRentLead ? selectedRentBudget : form.budgetRange}
+                    onChange={(e) => setBudget(e.target.value)}
                     className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
-                  />
+                  >
+                    <option value="">Select budget</option>
+                    {budgetOptions.map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
-                <Field label="Rent Budget Label">
-                  <input
-                    type="text"
-                    value={form.rentBudgetLabel}
-                    onChange={(e) =>
-                      setForm((p) => ({
-                        ...p,
-                        rentBudgetLabel: e.target.value,
-                      }))
-                    }
-                    placeholder="e.g., ₹15k–25k"
-                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
-                  />
-                </Field>
-                <Field label="Timeline">
-                  <input
-                    type="text"
+                )}
+                {form.purchaseType && form.propertySubType && (
+                <Field label="Timeline / Availability">
+                  <select
                     value={form.timeline}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, timeline: e.target.value }))
-                    }
-                    placeholder="e.g., 1–3 months"
+                    onChange={(e) => setForm((p) => ({ ...p, timeline: e.target.value }))}
                     className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
-                  />
+                  >
+                    <option value="">Select timeline</option>
+                    {timelineOptions.map(([value, label]) => <option key={value} value={label}>{label}</option>)}
+                  </select>
                 </Field>
-                <Field label="Furnishing">
-                  <input
-                    type="text"
+                )}
+                {form.purchaseType.endsWith("_buy") && (
+                <Field label="Buying Plan">
+                  <select
+                    value={form.investmentType}
+                    onChange={(e) => setForm((p) => ({ ...p, investmentType: e.target.value }))}
+                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
+                  >
+                    <option value="">Select buying plan</option>
+                    {BUYING_PLANS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </Field>
+                )}
+                {form.purchaseType && form.propertyType === "commercial" && (
+                <Field label="Commercial Space Size">
+                  <select
+                    value={form.spaceSize}
+                    onChange={(e) => setForm((p) => ({ ...p, spaceSize: e.target.value }))}
+                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
+                  >
+                    <option value="">Select size</option>
+                    {SPACE_SIZE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </Field>
+                )}
+                {form.purchaseType.endsWith("_rent") && (
+                <Field label="Furnishing / Setup">
+                  <select
                     value={form.furnishing}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, furnishing: e.target.value }))
-                    }
-                    placeholder="e.g., semi_furnished"
+                    onChange={(e) => setForm((p) => ({ ...p, furnishing: e.target.value }))}
+                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
+                  >
+                    <option value="">Select furnishing</option>
+                    {furnishingOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </Field>
+                )}
+                {form.purchaseType && (
+                <Field label="Preferred Site Visit Date and Time (optional)">
+                  <input
+                    type="datetime-local"
+                    value={form.siteVisit}
+                    onChange={(e) => setForm((p) => ({ ...p, siteVisit: e.target.value }))}
                     className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
                   />
                 </Field>
+                )}
                 <Field label="Assigned To">
-                  <input
-                    type="text"
+                  <select
                     value={form.assignedTo}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, assignedTo: e.target.value }))
-                    }
-                    placeholder="optional"
+                    onChange={(e) => setForm((p) => ({ ...p, assignedTo: e.target.value }))}
                     className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
-                  />
+                  >
+                    <option value="">Unassigned</option>
+                    {assigneeOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+                  </select>
                 </Field>
                 <Field label="Current Status">
                   <select
@@ -874,19 +1338,31 @@ export default function LeadsPage() {
                     ))}
                   </select>
                 </Field>
+                {propertyCriteriaReady && (
+                <Field label="Property (optional)">
+                  <select
+                    value={form.interested}
+                    onChange={(e) => setForm((p) => ({ ...p, interested: e.target.value }))}
+                    disabled={propertiesLoading}
+                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a] disabled:bg-gray-100"
+                  >
+                    <option value="">
+                      {propertiesLoading
+                        ? "Loading matching properties..."
+                        : matchingProperties.length
+                          ? "Select property (optional)"
+                          : "No matching properties"}
+                    </option>
+                    {matchingProperties.map((property) => (
+                      <option key={property._id} value={property._id}>
+                        {property.propertyId || "Property"} - {property.internalName || property.title}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                )}
               </div>
 
-              <Field label="Notes">
-                <textarea
-                  rows={3}
-                  value={form.notes}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, notes: e.target.value }))
-                  }
-                  placeholder="Optional notes..."
-                  className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
-                />
-              </Field>
             </div>
 
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 px-5 py-4 border-t border-[#e8f0e6]">
@@ -918,11 +1394,9 @@ export default function LeadsPage() {
   );
 }
 
-function Th({ children, align = "left" }) {
-  const cls =
-    align === "right"
-      ? "text-right px-5 py-3 text-xs font-medium text-[#6a7f6a] uppercase tracking-wider"
-      : "text-left px-5 py-3 text-xs font-medium text-[#6a7f6a] uppercase tracking-wider";
+function Th({ children, align = "left", hidden = false }) {
+  const alignment = align === "right" ? "text-right" : "text-left";
+  const cls = `${hidden ? "hidden " : ""}${alignment} px-5 py-3 text-xs font-medium text-[#6a7f6a] uppercase tracking-wider`;
   return <th className={cls}>{children}</th>;
 }
 

@@ -1,6 +1,7 @@
 import dbConnect, { isDbConnected } from '@/lib/mongodb';
 import Lead from '@/lib/models/Lead';
 import Property from '@/lib/models/Property';
+import { generateUniquePropertyId } from '@/lib/property-id';
 import mongoose from 'mongoose';
 import { NextResponse } from 'next/server';
 import axios from 'axios';
@@ -48,7 +49,8 @@ export const runtime = 'nodejs';
  */
 
 const EXPERT_NAME = process.env.EXPERT_CONTACT_NAME || 'our team';
-const EXPERT_PHONE = process.env.EXPERT_CONTACT_PHONE || '+919510833599';
+const EXPERT_PHONE =
+  process.env.EXPERT_CONTACT_PHONE || '+91 8200906261 / +91 9727138080';
 
 // ---------------------------------------------------------------------------
 // 0. TRANSLATION HELPERS
@@ -245,11 +247,11 @@ async function sendList(to, bodyText, buttonLabel, rows, sectionTitle = 'Options
   });
 }
 
-async function sendImageWithCaption(to, imageUrl, caption) {
+async function sendImage(to, imageUrl) {
   return callGraphApi({
     to,
     type: 'image',
-    image: { link: imageUrl, caption: caption.slice(0, 1024) },
+    image: { link: imageUrl },
   });
 }
 
@@ -455,21 +457,6 @@ function bucketRentAmount(amount) {
   return 'luxury';
 }
 
-function generatePropertyId(city, area) {
-  const cityCode = (city || 'XXX').substring(0, 3).toUpperCase();
-  const areaCode = (area || 'YYY').substring(0, 3).toUpperCase();
-  const randomNum = Math.floor(Math.random() * 9000 + 1000);
-  return `${cityCode}${areaCode}${randomNum}`;
-}
-
-async function generateUniquePropertyId(city, area, maxAttempts = 5) {
-  for (let i = 0; i < maxAttempts; i++) {
-    const id = generatePropertyId(city, area);
-    if (!(await Property.findOne({ propertyId: id }))) return id;
-  }
-  return `${generatePropertyId(city, area)}${Date.now().toString().slice(-4)}`;
-}
-
 function parseCityArea(text) {
   const raw = String(text || '').replace(/\s+/g, ' ').trim();
   const parts = raw.split(',').map((p) => p.trim()).filter(Boolean);
@@ -504,7 +491,7 @@ async function createPendingRentOutListing(lead) {
 
   const title = `${isCommercial ? subType : configuration.toUpperCase() + ' ' + subType} for Rent in ${lead.area}`;
 
-  const propertyId = await generateUniquePropertyId(lead.city, lead.area);
+  const propertyId = await generateUniquePropertyId(Property);
 
   const property = await Property.create({
     propertyId,
@@ -579,11 +566,6 @@ function formatPlaceListMultiline(places, opts = {}) {
 async function getAvailablePlaceRows() {
   await canonicalizeStoredPlaces();
   return Property.find({ status: 'available' }).select('city area').lean();
-}
-
-async function getServedCities() {
-  const rows = await getAvailablePlaceRows();
-  return uniqueTitleCase(rows.map((r) => r.city));
 }
 
 async function getAreasForCity(city) {
@@ -723,7 +705,7 @@ async function findMatchingProperties(lead) {
     )
     .slice(0, 10);
 
-  lead._hadExactMatch =
+  lead.hadExactMatch =
     ranked.length > 0 && !lead._usedAreaFallback && ranked[0].score > 100;
 
   return ranked.map((row) => row.property);
@@ -827,6 +809,7 @@ function formatFloor(fl, lang = 'en') {
 }
 
 const CARD_LABELS = {
+  propertyCode: { en: 'Property ID', hi: 'प्रॉपर्टी आईडी', gu: 'પ્રોપર્ટી આઈડી' },
   location: { en: 'Location', hi: 'स्थान', gu: 'સ્થળ' },
   propertyType: { en: 'Property Type', hi: 'संपत्ति प्रकार', gu: 'પ્રોપર્ટી પ્રકાર' },
   configuration: { en: 'Configuration', hi: 'कॉन्फ़िगरेशन', gu: 'કન્ફિગરેશન' },
@@ -841,6 +824,8 @@ const CARD_LABELS = {
   floor: { en: 'Floor', hi: 'मंज़िल', gu: 'માળ' },
   floorSuffix: { en: 'Floor', hi: 'मंज़िल', gu: 'માળ' },
   availableFrom: { en: 'Available From', hi: 'उपलब्ध तिथि', gu: 'ઉપલબ્ધ તારીખ' },
+  buildingStatus: { en: 'Building Status', hi: 'निर्माण स्थिति', gu: 'બિલ્ડિંગ સ્થિતિ' },
+  video: { en: 'Video', hi: 'वीडियो', gu: 'વિડિયો' },
   features: { en: 'Features', hi: 'विशेषताएं', gu: 'સુવિધાઓ' },
   sqft: { en: 'Sq. Ft.', hi: 'वर्ग फुट', gu: 'ચો. ફૂટ' },
   tenantPreferences: { en: 'Tenant Preferences', hi: 'किरायेदार प्राथमिकता', gu: 'ભાડૂત પ્રાથમિકતા' },
@@ -852,6 +837,18 @@ function propertyCardCaption(property, lang = 'en') {
   const lines = [];
   lines.push(`🏢 *${property.title}*`);
   lines.push('');
+  if (property.propertyId) lines.push(`🆔 ${L('propertyCode')} : *${property.propertyId}*`);
+  const buildingStatusLabels = {
+    under_construction: 'Under Construction',
+    new_booking: 'New Booking',
+    resale_property: 'Resale Property',
+  };
+  if (property.buildingStatus && buildingStatusLabels[property.buildingStatus]) {
+    lines.push(`🏗️ ${L('buildingStatus')} : ${buildingStatusLabels[property.buildingStatus]}`);
+  }
+  if (property.videoLink) {
+    lines.push(`🎥 ${L('video')} : ${property.videoLink}`);
+  }
   lines.push(`📍 ${L('location')} : ${toTitleCase(property.area)}, ${toTitleCase(property.city)}`);
   lines.push(`🏠 ${L('propertyType')} : ${formatSubType(property.propertySubType, lang)}`);
 
@@ -946,17 +943,32 @@ const PROPERTY_CARD_HEADER = {
   },
 };
 
-async function sendPropertyCard(phone, property, { isFallback = false, lang = 'en' } = {}) {
-  const header = t(
-    lang,
-    isFallback ? PROPERTY_CARD_HEADER.fallback : PROPERTY_CARD_HEADER.match
-  );
-  await sendText(phone, header);
+async function sendPropertyCard(
+  phone,
+  property,
+  { isFallback = false, lang = 'en', showHeader = true } = {}
+) {
+  if (showHeader) {
+    const header = t(
+      lang,
+      isFallback ? PROPERTY_CARD_HEADER.fallback : PROPERTY_CARD_HEADER.match
+    );
+    await sendText(phone, header);
+  }
 
   const caption = propertyCardCaption(property, lang);
+  const imageUrls = (property.images || [])
+    .map((image) => typeof image === 'string' ? image : image?.url)
+    .filter(Boolean);
+  if (property.imageUrl && !imageUrls.includes(property.imageUrl)) {
+    imageUrls.unshift(property.imageUrl);
+  }
 
-  if (property.imageUrl) {
-    await sendImageWithCaption(phone, property.imageUrl, caption);
+  if (imageUrls.length) {
+    for (const imageUrl of imageUrls) {
+      await sendImage(phone, imageUrl);
+    }
+    await sendText(phone, caption);
   } else {
     await sendText(phone, caption);
   }
@@ -1002,99 +1014,132 @@ const STEPS = {
   askPhone: {
     kind: 'text',
     prompt: {
-      en: '📱 Please share your WhatsApp contact number (calling number or an alternative contact number).',
-      hi: '📱 कृपया अपना संपर्क नंबर साझा करें।',
-      gu: '📱 કૃપા કરી તમારો સંપર્ક નંબર શેર કરો.',
+      en: ' To help you better and keep you updated about suitable properties,📱 Please enter your alternate contact number.',
+      hi: ' धन्यवाद, राहुल! 😊 आपकी बहतर सहायता करन और आपको उपयक्त प्रॉपर्टी की जानकारी दत रहन क लिए, 📱 कपया अपना वकल्पिक सप नबर द कर',
+      gu: 'આભાર, રાહલ! 😊 તમન વધ સારી રીત મદદ કરવા અન યોગ્ય પ્રોપર્ટીની મા હિતી આપતા રહવા માટ, 📱 કપા કરીન તમારો વક લ્પિક સપ નબર દાખલ કરો.',
     },
     validate: (v) => /^[+]?[\d\s-]{7,15}$/.test(v.trim()),
     apply: async (lead, value) => {
       lead.phoneNumber = value.trim();
     },
-    next: async () => 'askEmail',
+    next: async () => 'askSearchMode',
   },
 
-  askEmail: {
-    kind: 'text',
+  askSearchMode: {
+    kind: 'buttons',
     prompt: {
-      en: '📧 Please enter your email address.',
-      hi: '📧 कृपया अपना ईमेल पता दर्ज करें।',
-      gu: '📧 કૃપા કરી તમારું ઈમેલ સરનામું દાખલ કરો.',
+      en: 'How would you like to proceed with your property search?\n\n🔑 Search by Property ID\n🏘️ Explore Other Properties (Buy / Rent)',
+      hi: 'आप अपनी प्रॉपर्टी की खोज कैसे जारी रखना चाहेंगे?\n\n🔑 प्रॉपर्टी आईडी से खोजें\n🏘️ अन्य प्रॉपर्टी देखें (खरीदें / किराए पर लें)',
+      gu: 'તમે તમારી પ્રોપર્ટીની શોધ કેવી રીતે આગળ વધારવા માંગો છો?\n\n🔑 પ્રોપર્ટી ID થી શોધો\n🏘️ અન્ય પ્રોપર્ટી જુઓ (ખરીદો / ભાડે)',
     },
-    validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()),
+    options: [
+      {
+        id: 'search_by_property_id',
+        title: { en: '🔑 Search by ID', hi: '🔑 ID से खोजें', gu: '🔑 ID થી શોધો' },
+      },
+      {
+        id: 'explore_properties',
+        title: { en: '🏘️ Explore Other', hi: '🏘️ अन्य देखें', gu: '🏘️ અન્ય જુઓ' },
+      },
+    ],
+    next: async (_lead, value) =>
+      value === 'search_by_property_id' ? 'askPropertyId' : 'askPropertyCategory',
     apply: async (lead, value) => {
-      lead.email = value.trim().toLowerCase();
+      lead.propertyIdSearch = value === 'search_by_property_id';
     },
-    onAfterApply: async (lead) => {
-      try {
-        const lang = lead.preferredLanguage || 'en';
-        const msg = t(lang, {
-          en: "Perfect! Thank you for sharing your details. ✅\nLet's find a property that best matches your requirements.",
-          hi: 'बढ़िया! आपकी जानकारी साझा करने के लिए धन्यवाद। ✅\nचलिए आपकी आवश्यकताओं से मेल खाती संपत्ति खोजें।',
-          gu: 'ઉત્તમ! તમારી વિગતો શેર કરવા બદલ આભાર. ✅\nચાલો તમારી જરૂરિયાતો સાથે મેળ ખાતી પ્રોપર્ટી શોધીએ.',
-        });
-        await sendText(lead.phone, msg);
-      } catch (e) {
-        console.error('[webhook] Transition message failed:', e);
-      }
-    },
-    // NEW FLOW: email -> category -> sub type -> city -> area -> property type
-    next: async () => 'askPropertyCategory',
   },
 
-  askCity: {
+  askPropertyId: {
     kind: 'text',
     prompt: {
-      en: '📍 Which city are you looking for a property in?',
-      hi: '📍 आप किस शहर में संपत्ति ढूंढ रहे हैं?',
-      gu: '📍 તમે કયા શહેરમાં પ્રોપર્ટી શોધી રહ્યાં છો?',
+      en: '🔑 Please enter the Property ID to view the property details.',
+      hi: '🔑 प्रॉपर्टी की जानकारी देखने के लिए कृपया Property ID दर्ज करें।',
+      gu: '🔑 પ્રોપર્ટીની વિગતો જોવા માટે કૃપા કરીને Property ID દાખલ કરો.',
     },
-    retryPrompt: {
-      en: '📍 Please type a city from the list above.',
-      hi: '📍 कृपया ऊपर दी गई सूची से कोई शहर चुनें।',
-      gu: '📍 કૃપા કરી ઉપરની યાદીમાંથી શહેર પસંદ કરો.',
-    },
-    validate: async (v) => {
-      const served = await getServedCities();
-      if (served.length === 0) return Boolean(placeKey(v));
-      return Boolean(matchPlace(v, served));
+    validate: async (value, lead) => {
+      const propertyId = value.trim().toUpperCase();
+      if (!/^HH\d+$/.test(propertyId)) return false;
+      const property = await Property.findOne({
+        propertyId,
+        status: 'available',
+      }).lean();
+      lead._searchedProperty = property;
+      return Boolean(property);
     },
     onInvalid: async (lead, lang) => {
-      lead.cityAttempts = (lead.cityAttempts || 0) + 1;
-      const served = await getServedCities();
-      const servedList = formatPlaceListMultiline(served) || '📍(no cities yet)';
-      if (lead.cityAttempts >= 3) {
-        lead.step = 'completed';
+      if (lead._propertyIdLookupFailed) {
+        lead._propertyIdLookupFailed = false;
         return {
           text: t(lang, {
-            en: "We don't have listings in that city yet. Let's have one of our experts help you directly instead.",
-            hi: 'उस शहर में अभी हमारी लिस्टिंग नहीं है। इसके बजाय हमारे किसी विशेषज्ञ को सीधे आपकी मदद करने दें।',
-            gu: 'તે શહેરમાં હજુ અમારી લિસ્ટિંગ નથી. તેના બદલે અમારા નિષ્ણાતને સીધા તમારી મદદ કરવા દો.',
+            en: "I couldn't look up that Property ID just now. Please try again.",
+            hi: 'अभी Property ID की जांच नहीं हो सकी। कृपया फिर से कोशिश करें।',
+            gu: 'હમણાં Property ID તપાસી શકાયું નથી. કૃપા કરીને ફરીથી પ્રયાસ કરો.',
           }),
-          redirectTo: 'talkToExpertMessage',
         };
       }
       return {
         text: t(lang, {
-          en: `We don't have active listings there yet. Currently we serve:\n${servedList}`,
-          hi: `वहां अभी हमारी लिस्टिंग नहीं है। फिलहाल हम इन शहरों में सेवा देते हैं:\n${servedList}`,
-          gu: `ત્યાં હજુ અમારી લિસ્ટિંગ નથી. હાલમાં અમે આ શહેરોમાં સેવા આપીએ છીએ:\n${servedList}`,
+          en: 'I could not find an available property with that ID. Please check it and try again.',
+          hi: 'इस ID से कोई उपलब्ध प्रॉपर्टी नहीं मिली। कृपया ID जांचकर फिर से दर्ज करें।',
+          gu: 'આ ID સાથે કોઈ ઉપલબ્ધ પ્રોપર્ટી મળી નથી. કૃપા કરીને ID તપાસીને ફરીથી દાખલ કરો.',
         }),
       };
     },
-    apply: async (lead, value) => {
-      const served = await getServedCities();
-      lead.city = matchPlace(value, served) || toTitleCase(value);
-      lead.cityAttempts = 0;
+    apply: async (lead) => {
+      const property = lead._searchedProperty;
+      if (!property) {
+        throw new Error('[webhook] Property ID validation did not retain the property');
+      }
+
+      const categoryTab = property.categoryTab || '';
+      const isRental =
+        categoryTab.endsWith('_rent') ||
+        property.propertyType === 'rent' ||
+        property.monthlyRent != null;
+      const isCommercial =
+        categoryTab.startsWith('commercial_') ||
+        property.propertyType === 'commercial' ||
+        property.configuration === 'commercial';
+
+      lead.leadType = 'seeker';
+      lead.propertyCategory = isRental ? 'rent_lease' : 'purchase';
+      lead.purchaseType = `${isCommercial ? 'commercial' : 'residential'}_${
+        isRental ? 'rent' : 'buy'
+      }`;
+      lead.propertyType = property.propertyType;
+      lead.propertySubType = property.propertySubType;
+      lead.city = property.city;
+      lead.area = property.area;
+      lead.configuration = property.configuration;
+      lead.budgetRange = property.budgetRange;
+      lead.furnishing = property.furnishing;
+      lead.spaceSize = property.spaceSize;
+
+      const firstPropertyId = property._id.toString();
+      lead.matchedProperties = [property._id];
+      lead.currentPropertyIndex = 0;
+      const otherMatches = await findMatchingProperties(lead);
+      const additionalProperties = otherMatches.filter(
+        (match) => match._id.toString() !== firstPropertyId
+      );
+      lead.matchedProperties = [
+        property._id,
+        ...additionalProperties.map((match) => match._id),
+      ];
+      lead._matchCache = [property, ...additionalProperties];
+      lead.hadExactMatch = true;
+      lead.propertyIdSearch = true;
+      lead._searchedProperty = null;
     },
-    next: async () => 'askArea',
+    next: async () => 'showing_property',
   },
 
   askArea: {
     kind: 'text',
     prompt: {
-      en: 'Great choice! 📍 Now, please tell us which area or locality you are interested in.',
-      hi: 'बढ़िया चुनाव! 📍 अब कृपया बताएं कि आप किस क्षेत्र में रुचि रखते हैं।',
-      gu: 'સરસ પસંદગી! 📍 હવે કૃપા કરી જણાવો કે તમને કયા વિસ્તારમાં રસ છે.',
+      en: 'In Surat, which area are you looking for a property in? 📍',
+      hi: 'सूरत में आप किस क्षेत्र में संपत्ति ढूंढ रहे हैं? 📍',
+      gu: 'સુરતમાં તમે કયા વિસ્તારમાં પ્રોપર્ટી શોધી રહ્યા છો? 📍',
     },
     retryPrompt: {
       en: '📍 Please type an area from the list above.',
@@ -1155,7 +1200,7 @@ const STEPS = {
     },
     options: [
       { id: 'purchase', title: { en: '🏡 Buy Property', hi: '🏡 प्रॉपर्टी खरीदें', gu: '🏡 પ્રોપર્ટી ખરીદો' } },
-      { id: 'rent_lease', title: { en: '🔑 Find a Rental', hi: '🔑 किराया खोजें', gu: '🔑 ભાડું શોધો' } },
+      { id: 'rent_lease', title: { en: '🔑 Rental Property', hi: '🔑 किराया खोजें', gu: '🔑 ભાડું શોધો' } },
       { id: 'rent_out', title: { en: '🏠 Rent Out', hi: '🏠 किराए पर दें', gu: '🏠 ભાડે આપો' } },
     ],
     apply: async (lead, value) => {
@@ -1193,7 +1238,10 @@ const STEPS = {
       lead.propertyType = value === 'commercial_buy' ? 'commercial' : 'buy';
     },
     // City/area are asked next (before the residential/commercial type list).
-    next: async () => 'askCity',
+    next: async (lead) => {
+      lead.city = 'Surat';
+      return 'askArea';
+    },
   },
 
   askResidentialPropertyType: {
@@ -1212,11 +1260,12 @@ const STEPS = {
       { id: 'studio', title: { en: '🏙️ Studio Apartment', hi: '🏙️ स्टूडियो अपार्टमेंट', gu: '🏙️ સ્ટુડિયો એપાર્ટમેન્ટ' } },
       { id: 'penthouse', title: { en: '🌆 Penthouse', hi: '🌆 पेंटहाउस', gu: '🌆 પેન્ટહાઉસ' } },
       { id: 'farmhouse', title: { en: '🌳 Farmhouse', hi: '🌳 फार्महाउस', gu: '🌳 ફાર્મહાઉસ' } },
+      { id: 'plot', title: { en: '🌱 Land / Plot', hi: '🌱 भूमि / प्लॉट', gu: '🌱 જમીન / પ્લોટ' } },
     ],
     apply: async (lead, value) => {
       lead.propertySubType = value;
     },
-    next: async () => 'askConfiguration',
+    next: async (lead) => lead.propertySubType === 'plot' ? 'askBudget' : 'askConfiguration',
   },
 
   askCommercialPropertyType: {
@@ -1233,6 +1282,7 @@ const STEPS = {
       { id: 'showroom', title: { en: '🏬 Showroom', hi: '🏬 शोरूम', gu: '🏬 શોરૂમ' } },
       { id: 'warehouse', title: { en: '🏭 Warehouse / Godown', hi: '🏭 गोदाम', gu: '🏭 વેરહાઉસ / ગોડાઉન' } },
       { id: 'industrial', title: { en: '🏗️ Industrial Land / Factory', hi: '🏗️ औद्योगिक भूमि / फैक्ट्री', gu: '🏗️ ઔદ્યોગિક જમીન / ફેક્ટરી' } },
+      { id: 'plot', title: { en: '🌱 Land / Plot', hi: '🌱 भूमि / प्लॉट', gu: '🌱 જમીન / પ્લોટ' } },
       { id: 'coworking', title: { en: '💼 Co-working Space', hi: '💼 को-वर्किंग स्पेस', gu: '💼 કો-વર્કિંગ સ્પેસ' } },
     ],
     apply: async (lead, value) => {
@@ -1308,7 +1358,10 @@ const STEPS = {
       lead.propertyType = value === 'commercial' ? 'commercial' : 'rent';
     },
     // City/area are asked next (before the residential/commercial type list).
-    next: async () => 'askCity',
+    next: async (lead) => {
+      lead.city = 'Surat';
+      return 'askArea';
+    },
   },
 
   askRentResidentialType: {
@@ -1343,7 +1396,6 @@ const STEPS = {
     },
     listButton: { en: 'Choose', hi: 'चुनें', gu: 'પસંદ કરો' },
     options: [
-      { id: '1rk', title: { en: '🏠 1 RK', hi: '🏠 1 RK', gu: '🏠 1 RK' } },
       { id: '1bhk', title: { en: '🏠 1 BHK', hi: '🏠 1 BHK', gu: '🏠 1 BHK' } },
       { id: '2bhk', title: { en: '🏠 2 BHK', hi: '🏠 2 BHK', gu: '🏠 2 BHK' } },
       { id: '3bhk', title: { en: '🏠 3 BHK', hi: '🏠 3 BHK', gu: '🏠 3 BHK' } },
@@ -1364,14 +1416,12 @@ const STEPS = {
     },
     listButton: { en: 'Choose', hi: 'चुनें', gu: 'પસંદ કરો' },
     options: [
-      { id: '1rk', title: { en: '🏠 1 RK', hi: '🏠 1 RK', gu: '🏠 1 RK' } },
       { id: '1bhk', title: { en: '🏠 1 BHK', hi: '🏠 1 BHK', gu: '🏠 1 BHK' } },
       { id: '2bhk', title: { en: '🏠 2 BHK', hi: '🏠 2 BHK', gu: '🏠 2 BHK' } },
       { id: '3bhk', title: { en: '🏠 3 BHK', hi: '🏠 3 BHK', gu: '🏠 3 BHK' } },
       { id: '4bhk', title: { en: '🏠 4 BHK', hi: '🏠 4 BHK', gu: '🏠 4 BHK' } },
       { id: '5bhk_plus', title: { en: '🏠 5+ BHK', hi: '🏠 5+ BHK', gu: '🏠 5+ BHK' } },
       { id: 'duplex', title: { en: '🏘️ Duplex', hi: '🏘️ डुप्लेक्स', gu: '🏘️ ડુપ્લેક્સ' } },
-      { id: 'triplex', title: { en: '🏛️ Triplex', hi: '🏛️ ट्रिप्लेक्स', gu: '🏛️ ટ્રિપ્લેક્સ' } },
     ],
     apply: async (lead, value) => {
       lead.configuration = value === '1rk' ? '1bhk' : value;
@@ -1407,18 +1457,18 @@ const STEPS = {
     },
     listButton: { en: 'Choose', hi: 'चुनें', gu: 'પસંદ કરો' },
     options: [
-      { id: 'below_10k', title: { en: '💵 Below ₹10,000', hi: '💵 ₹10,000 से कम', gu: '💵 ₹10,000 થી ઓછું' } },
-      { id: '10k_20k', title: { en: '💵 ₹10,000-₹20,000', hi: '💵 ₹10,000-₹20,000', gu: '💵 ₹10,000-₹20,000' } },
-      { id: '20k_40k', title: { en: '💵 ₹20,000-₹40,000', hi: '💵 ₹20,000-₹40,000', gu: '💵 ₹20,000-₹40,000' } },
-      { id: 'above_40k', title: { en: '💎 Above ₹40,000', hi: '💎 ₹40,000 से ऊपर', gu: '💎 ₹40,000 થી વધુ' } },
+      { id: '15k_25k', title: { en: '💵 ₹15,000-₹25,000', hi: '💵 ₹15,000-₹25,000', gu: '💵 ₹15,000-₹25,000' } },
+      { id: '25k_35k', title: { en: '💵 ₹25,000-₹35,000', hi: '💵 ₹25,000-₹35,000', gu: '💵 ₹25,000-₹35,000' } },
+      { id: '35k_50k', title: { en: '💵 ₹35,000-₹50,000', hi: '💵 ₹35,000-₹50,000', gu: '💵 ₹35,000-₹50,000' } },
+      { id: 'above_50k', title: { en: '💎 Above ₹50,000', hi: '💎 ₹50,000 से ऊपर', gu: '💎 ₹50,000 થી વધુ' } },
     ],
     apply: async (lead, value, title) => {
       lead.rentBudgetLabel = title;
       lead.budgetRange = {
-        below_10k: 'low',
-        '10k_20k': 'mid',
-        '20k_40k': 'high',
-        above_40k: 'luxury',
+        '15k_25k': 'mid',
+        '25k_35k': 'high',
+        '35k_50k': 'luxury',
+        above_50k: 'luxury',
       }[value];
     },
     next: async () => 'askMoveInTimeline',
@@ -1433,9 +1483,9 @@ const STEPS = {
     },
     listButton: { en: 'Choose', hi: 'चुनें', gu: 'પસંદ કરો' },
     options: [
-      { id: '10L_30L', title: { en: '💵 ₹10L – ₹30L', hi: '💵 ₹10L – ₹30L', gu: '💵 ₹10L – ₹30L' } },
-      { id: '30L_60L', title: { en: '💵 ₹30L – ₹60L', hi: '💵 ₹30L – ₹60L', gu: '💵 ₹30L – ₹60L' } },
-      { id: '60L_1Cr', title: { en: '💵 ₹60L – ₹1Cr', hi: '💵 ₹60L – ₹1Cr', gu: '💵 ₹60L – ₹1Cr' } },
+      { id: '30L_50L', title: { en: '💵 ₹30L – ₹50L', hi: '💵 ₹30L – ₹50L', gu: '💵 ₹30L – ₹50L' } },
+      { id: '50L_75L', title: { en: '💵 ₹50L – ₹75L', hi: '💵 ₹50L – ₹75L', gu: '💵 ₹50L – ₹75L' } },
+      { id: '75L_1Cr', title: { en: '💵 ₹75L – ₹1Cr', hi: '💵 ₹75L – ₹1Cr', gu: '💵 ₹75L – ₹1Cr' } },
       { id: 'above_1Cr', title: { en: '💎 Above ₹1Cr', hi: '💎 ₹1Cr से ऊपर', gu: '💎 ₹1Cr થી વધુ' } },
     ],
     apply: async (lead, value) => {
@@ -1519,7 +1569,8 @@ const STEPS = {
         lead.matchedProperties = [];
         lead.currentPropertyIndex = 0;
         lead._matchCache = [];
-        lead._hadExactMatch = false;
+        lead.hadExactMatch = false;
+        lead.propertyIdSearch = false;
       }
 
       pushEnquiry(lead);
@@ -1655,7 +1706,7 @@ const STEPS = {
       gu: 'ઉત્તમ પસંદગી! 🏡\n\n⚠️ *સાઇટ વિઝિટ અંગે મહત્વની નોંધ*\n• સાઇટ વિઝિટ ચાર્જ: ₹250 પ્રતિ મુલાકાત\n• સાઇટ વિઝિટ મહત્તમ 2 વખત ફરી શેડ્યૂલ કરી શકાય છે.\n\nશું તમે આગળ વધવા માંગો છો?',
     }),
     options: [
-      { id: 'confirm_visit', title: { en: '✅ Confirm, Book a Visit', hi: '✅ पुष्टि करें', gu: '✅ પુષ્ટિ કરો' } },
+      { id: 'confirm_visit', title: { en: '✅ Confirm Visit', hi: '✅ पुष्टि करें', gu: '✅ પુષ્ટિ કરો' } },
       { id: 'cancel_visit', title: { en: '❌ Cancel', hi: '❌ रद्द करें', gu: '❌ રદ કરો' } },
     ],
     next: async (lead, value) =>
@@ -1996,8 +2047,9 @@ async function sendStepPrompt(phone, stepId, step, lead) {
 
   if (showingPropertyCtx) {
     await sendPropertyCard(phone, showingPropertyCtx.property, {
-      isFallback: !lead._hadExactMatch,
+      isFallback: !lead.hadExactMatch,
       lang,
+      showHeader: !lead.propertyIdSearch,
     });
 
     await new Promise((r) => setTimeout(r, 900));
@@ -2040,12 +2092,16 @@ async function sendWelcomeAndLanguagePrompt(phone, lead) {
   await sendStepPrompt(phone, 'askLanguage', STEPS.askLanguage, lead);
 }
 
+function getRestartCtaButton(lang) {
+  return {
+    id: 'restart',
+    title: t(lang, { en: '🔄 Restart', hi: '🔄 पुनः आरंभ करें', gu: '🔄 ફરી શરૂ કરો' }),
+  };
+}
+
 function getEndFlowCtaButtons(lang) {
   return [
-    {
-      id: 'restart',
-      title: t(lang, { en: '🔄 Restart', hi: '🔄 पुनः आरंभ करें', gu: '🔄 ફરી શરૂ કરો' }),
-    },
+    getRestartCtaButton(lang),
     {
       id: 'main_menu',
       title: t(lang, { en: '📋 Main Menu', hi: '📋 मुख्य मेनू', gu: '📋 મુખ્ય મેનૂ' }),
@@ -2053,21 +2109,21 @@ function getEndFlowCtaButtons(lang) {
   ];
 }
 
-async function sendTerminalMessage(phone, lead, text, terminalTag) {
+async function sendTerminalMessage(phone, lead, text, terminalTag, ctaButtons) {
   const lang = lead.preferredLanguage || 'en';
-  const ctaButtons = getEndFlowCtaButtons(lang);
+  const buttons = ctaButtons || getEndFlowCtaButtons(lang);
 
   if (lead) {
     pushConversation(lead, {
       direction: 'out',
       type: 'interactive',
       text,
-      payload: { terminal: terminalTag, options: ctaButtons },
+      payload: { terminal: terminalTag, options: buttons },
     });
     try { await lead.save(); } catch (e) { console.error(e); }
   }
 
-  await sendButtons(phone, text, ctaButtons);
+  await sendButtons(phone, text, buttons);
 }
 
 async function finalizeCompletedStepMessage(phone, lead, fromStepId, answerValue) {
@@ -2306,16 +2362,17 @@ async function handleMessage(phone, incoming) {
     await unsubscribeLead(lead);
 
     const msg = t(lang, {
-      en: "You've been unsubscribed from follow-up messages. 👋",
-      hi: 'आपने फॉलो-अप संदेशों से सदस्यता समाप्त कर दी है। 👋',
-      gu: 'તમે ફોલો-અપ સંદેશાઓમાંથી અનસબ્સ્ક્રાઇબ થયા છો. 👋',
+      en: 'Thank you for your inquiry.\n\nTeam Heaven Homes ❤️',
+      hi: 'आपकी पूछताछ के लिए धन्यवाद।\n\nटीम हेवन होम्स ❤️',
+      gu: 'તમારી પૂછપરછ બદલ આભાર.\n\nટીમ હેવન હોમ્સ ❤️',
     });
-    await sendTerminalMessage(phone, lead, msg, 'stopFollowUp');
+    await sendTerminalMessage(phone, lead, msg, 'stopFollowUp', [getRestartCtaButton(lang)]);
     return;
   }
 
   if (isRestartAction(interactiveId, text)) {
     const name = resetLeadProgress(lead);
+    lead.step = 'askLanguage';
     pushStatusChange(lead, 'active', 'whatsapp_bot', 'Restarted flow');
     await lead.save();
 
@@ -2331,11 +2388,25 @@ async function handleMessage(phone, incoming) {
   }
 
   if (interactiveId === 'main_menu') {
-    touchLeadActivity(lead);
+    resetLeadProgress(lead);
+    lead.step = 'askSearchMode';
     pushStatusChange(lead, 'active', 'whatsapp_bot', 'Returned to main menu');
+    await lead.save();
+    await sendStepPrompt(phone, 'askSearchMode', STEPS.askSearchMode, lead);
+    return;
+  }
+
+  if (lead.step === 'askEmail') {
     lead.step = 'askPropertyCategory';
     await lead.save();
-    await sendStepPrompt(phone, 'askPropertyCategory', STEPS.askPropertyCategory, lead);
+    await sendStepPrompt(phone, lead.step, STEPS[lead.step], lead);
+    return;
+  }
+  if (lead.step === 'askCity') {
+    lead.city = 'Surat';
+    lead.step = 'askArea';
+    await lead.save();
+    await sendStepPrompt(phone, lead.step, STEPS[lead.step], lead);
     return;
   }
 
@@ -2357,10 +2428,12 @@ async function handleMessage(phone, incoming) {
 
   if (isContinueAction(interactiveId, text)) {
     touchLeadActivity(lead);
-    await lead.save();
     const step = STEPS[lead.step];
-    if (step) await sendStepPrompt(phone, lead.step, step, lead);
-    return;
+    if (step) {
+      await lead.save();
+      await sendStepPrompt(phone, lead.step, step, lead);
+      return;
+    }
   }
 
   touchLeadActivity(lead);
@@ -2400,7 +2473,8 @@ async function handleMessage(phone, incoming) {
       isValid = step.validate ? await step.validate(text, lead) : text.length > 0;
     } catch (err) {
       console.error(`[webhook] Validate failed on step "${lead.step}":`, err);
-      isValid = Boolean(placeKey(text));
+      isValid = lead.step === 'askArea' && Boolean(placeKey(text));
+      if (lead.step === 'askPropertyId') lead._propertyIdLookupFailed = true;
     }
 
     if (!isValid) {

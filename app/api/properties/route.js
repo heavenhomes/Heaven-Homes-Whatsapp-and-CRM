@@ -15,7 +15,7 @@ const ALLOWED_FIELDS = [
   'city', 'area', 'propertyType', 'propertySubType',
   'budgetRange', 'price', 'configuration', 'spaceSize', 'location',
   'areaSqft', 'furnishing', 'description', 'features', 'imageUrl',
-  'imagePublicId', 'images', 'ownerPhone', 'ownerName', 'source',
+  'imagePublicId', 'images', 'videoLink', 'buildingStatus', 'ownerPhone', 'ownerName', 'source',
   'dimensions', 'facing', 'floor', 'monthlyRent', 'securityDeposit',
   'setupType', 'availableFrom', 'categoryTab',
   'brokerage', 'brokerageAmount',
@@ -39,7 +39,10 @@ export async function GET(request) {
     const skip = (page - 1) * limit;
 
     const city = searchParams.get('city');
+    const area = searchParams.get('area');
     const category = searchParams.get('category');
+    const propertySubType = searchParams.get('propertySubType');
+    const configuration = searchParams.get('configuration');
     const status = searchParams.get('status');
     const minPrice = searchParams.get('minPrice');
     const maxPrice = searchParams.get('maxPrice');
@@ -50,12 +53,13 @@ export async function GET(request) {
     else if (!status) query.status = 'available';
 
     if (city) query.city = { $regex: escapeRegex(city), $options: 'i' };
+    if (area) query.area = { $regex: `^${escapeRegex(area)}$`, $options: 'i' };
 
     if (category) {
       if (category === 'residential_buy') {
         query.propertyType = 'buy';
         query.propertySubType = {
-          $in: ['apartment', 'flat', 'house', 'villa', 'builder_floor', 'studio', 'penthouse', 'farmhouse'],
+          $in: ['apartment', 'flat', 'house', 'villa', 'builder_floor', 'studio', 'penthouse', 'farmhouse', 'plot'],
         };
       } else if (category === 'commercial_buy') {
         query.propertyType = 'commercial';
@@ -69,6 +73,13 @@ export async function GET(request) {
       } else {
         query.propertyType = category;
       }
+    }
+
+    if (propertySubType) {
+      query.propertySubType = { $regex: `^${escapeRegex(propertySubType)}$`, $options: 'i' };
+    }
+    if (configuration) {
+      query.configuration = { $regex: `^${escapeRegex(configuration)}$`, $options: 'i' };
     }
 
     if (minPrice || maxPrice) {
@@ -129,6 +140,27 @@ export async function POST(request) {
     for (const key of ALLOWED_FIELDS) {
       if (body[key] !== undefined) cleanBody[key] = body[key];
     }
+    if (cleanBody.images !== undefined && !Array.isArray(cleanBody.images)) {
+      return NextResponse.json({ error: 'Property images must be an array' }, { status: 400 });
+    }
+    if (cleanBody.images?.length > 10) {
+      return NextResponse.json({ error: 'A property can have up to 10 photos' }, { status: 400 });
+    }
+    if (cleanBody.images) {
+      cleanBody.images = cleanBody.images.map((image) =>
+        typeof image === 'string' ? { url: image, publicId: '' } : image
+      );
+      if (cleanBody.images.some((image) => !image?.url)) {
+        return NextResponse.json({ error: 'Each property photo must include a URL' }, { status: 400 });
+      }
+    }
+    if (cleanBody.images?.length) {
+      cleanBody.imageUrl = cleanBody.images[0].url;
+      cleanBody.imagePublicId = cleanBody.images[0].publicId || '';
+    } else if (cleanBody.images) {
+      cleanBody.imageUrl = '';
+      cleanBody.imagePublicId = '';
+    }
      if (!isOwner && uploaderId) {
       cleanBody.uploadedBy = uploaderId;
     }
@@ -141,7 +173,7 @@ export async function POST(request) {
       cleanBody.status = body.status || 'available';
     }
 
-    const propertyId = await generateUniquePropertyId(Property, body.city, body.area);
+    const propertyId = await generateUniquePropertyId(Property);
 
     const property = new Property({
       ...cleanBody,

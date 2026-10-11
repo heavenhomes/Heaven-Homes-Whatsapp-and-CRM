@@ -75,7 +75,7 @@ export async function GET(request) {
       _id: lead._id,
       name: lead.name || 'Not provided',
       phone: lead.phone,
-      phoneNumber: lead.phoneNumber || 'Not provided',
+      phoneNumber: lead.phoneNumber || lead.phone,
       email: lead.email || null,
       leadType: lead.leadType,
       preferredLanguage: lead.preferredLanguage || 'en',
@@ -95,6 +95,7 @@ export async function GET(request) {
       siteVisit: lead.siteVisit || null,
       shiftingDate: lead.shiftingDate || null,
       spaceSize: lead.spaceSize || null,
+      notes: lead.notes || '',
       step: lead.step,
       isCompleted: lead.step === 'completed',
       source: lead.source || 'whatsapp_bot',
@@ -137,26 +138,98 @@ export async function POST(request) {
 
     const cleanBody = {};
     for (const key of ALLOWED_LEAD_FIELDS) {
-      if (body[key] !== undefined) cleanBody[key] = body[key];
+      if (key !== 'phone' && body[key] !== undefined) cleanBody[key] = body[key];
+    }
+    if (body.source === 'manual') {
+      const category = cleanBody.propertyCategory;
+      const purchaseType = cleanBody.purchaseType;
+      const categoryIsValid = ['purchase', 'rent_lease', 'rent_out'].includes(category);
+      const expectedSuffix = category === 'purchase' ? '_buy' : '_rent';
+      if (
+        !categoryIsValid ||
+        !['residential_buy', 'commercial_buy', 'residential_rent', 'commercial_rent'].includes(purchaseType) ||
+        !purchaseType.endsWith(expectedSuffix)
+      ) {
+        return NextResponse.json(
+          { error: 'Select a valid property category and residential/commercial type' },
+          { status: 400 }
+        );
+      }
+
+      const isCommercial = purchaseType.startsWith('commercial_');
+      cleanBody.leadType = category === 'rent_out' ? 'lister' : 'seeker';
+      cleanBody.propertyType = isCommercial
+        ? 'commercial'
+        : purchaseType.endsWith('_rent')
+          ? 'rent'
+          : 'buy';
+      cleanBody.rentTypeLabel = purchaseType.endsWith('_rent')
+        ? (isCommercial ? 'Commercial' : 'Residential')
+        : '';
+      cleanBody.city = 'Surat';
+    }
+    if (body.source === 'manual' && body.step === undefined) {
+      cleanBody.step = 'completed';
+    }
+
+    const existingLead = await Lead.findOne({ phone: body.phone }).select('_id').lean();
+    const update = {
+      $set: cleanBody,
+      $setOnInsert: { phone: body.phone },
+    };
+
+    if (body.source === 'manual' && cleanBody.propertyCategory) {
+      const purpose = cleanBody.leadType === 'lister'
+        ? 'Rent Out'
+        : cleanBody.propertyCategory === 'rent_lease'
+          ? 'Rent'
+          : 'Buy';
+      const categoryLabel = cleanBody.propertyType === 'commercial' ? 'Commercial' : 'Residential';
+      const subtypeLabel = cleanBody.propertySubType
+        ? cleanBody.propertySubType.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
+        : '';
+      const configurationLabel = cleanBody.configuration
+        ? cleanBody.configuration.toUpperCase().replace('BHK', ' BHK').trim()
+        : '';
+
+      update.$push = {
+        enquiries: {
+          submittedAt: new Date(),
+          city: cleanBody.city || 'Surat',
+          area: cleanBody.area || '',
+          purpose,
+          propertyCategory: categoryLabel,
+          propertyType: subtypeLabel,
+          configuration: cleanBody.configuration === 'commercial' ? 'Commercial' : configurationLabel,
+          size: cleanBody.spaceSize || '',
+          budgetRange: cleanBody.budgetRange || '',
+          budgetLabel: cleanBody.rentBudgetLabel || cleanBody.budgetRange || '',
+          timeline: cleanBody.timeline || '',
+          buyingPlan: cleanBody.investmentType || '',
+          furnishing: cleanBody.furnishing || '',
+          spaceSize: cleanBody.spaceSize || '',
+          source: 'manual',
+        },
+      };
     }
 
     const lead = await Lead.findOneAndUpdate(
       { phone: body.phone },
-      { $set: cleanBody, $setOnInsert: { phone: body.phone } },
+      update,
       { returnDocument: 'after', upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
 
-    const isNew = lead.createdAt.getTime() === lead.updatedAt.getTime();
+    const isNew = !existingLead;
     if (isNew) {
       await logActivity(request, {
         action: 'lead.created',
         category: 'lead',
-        description: `New lead from WhatsApp: ${lead.name || lead.phone}`,
+        description: `New ${lead.source === 'manual' ? 'manual' : 'WhatsApp'} lead: ${lead.name || lead.phone}`,
         targetType: 'Lead',
         targetId: lead._id,
         targetLabel: lead.name || lead.phone,
         severity: 'success',
-        changes: { phone: lead.phone, source: 'whatsapp_bot' },
+        changes: { phone: lead.phone, source: lead.source || 'whatsapp_bot' },
       });
     }
 

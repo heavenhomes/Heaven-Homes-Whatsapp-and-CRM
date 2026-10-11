@@ -30,11 +30,12 @@ const FOOD_PREFERENCES = [
 ];
 
 const RES_BUY_TYPES = ['apartment', 'flat', 'house', 'villa', 'builder_floor', 'studio', 'penthouse', 'farmhouse','plot'];
-const COM_BUY_TYPES = ['office', 'shop', 'showroom', 'warehouse', 'industrial', 'coworking'];
+const COM_BUY_TYPES = ['office', 'shop', 'showroom', 'warehouse', 'industrial', 'coworking', 'plot'];
 const RES_RENT_TYPES = ['apartment', 'flat', 'house', 'villa', 'builder_floor', 'pg', 'studio', 'farmhouse'];
 const COM_RENT_TYPES = ['office', 'shop', 'showroom', 'warehouse', 'coworking', 'factory'];
 
 const RESIDENTIAL_CONFIGS = ['1rk', '1bhk', '2bhk', '3bhk', '4bhk', '5bhk_plus', 'duplex', 'triplex'];
+const RESIDENTIAL_RENT_CONFIGS = ['1bhk', '2bhk', '3bhk', '4bhk', '5bhk_plus', 'duplex'];
 
 const FEATURE_LISTS = {
   residential_buy: [
@@ -89,7 +90,7 @@ const EMPTY_FORM = {
   categoryTab: 'residential_buy',
   internalName: '',
   title: '',
-  city: '',
+  city: 'Surat',
   area: '',
   propertyType: 'buy',
   propertySubType: 'apartment',
@@ -106,8 +107,12 @@ const EMPTY_FORM = {
   availableFrom: '',
   description: '',
   features: [],
+  images: [],
   imageUrl: '',
   imagePublicId: '',
+  propertyId: '',
+  videoLink: '',
+  buildingStatus: '',
   status: 'available',
   budgetRange: 'mid',
   location: '',
@@ -136,6 +141,7 @@ export default function PropertyModal({ isOpen, onClose, onSave, property, isOwn
       setFormData({
         categoryTab: tab,
         internalName: property.internalName || '',
+        propertyId: property.propertyId || '',
         title: property.title || '',
         city: property.city || '',
         area: property.area || '',
@@ -154,8 +160,21 @@ export default function PropertyModal({ isOpen, onClose, onSave, property, isOwn
         availableFrom: property.availableFrom || '',
         description: property.description || '',
         features: property.features || [],
+        images: (() => {
+          const images = Array.isArray(property.images)
+            ? property.images
+                .map((image) => typeof image === 'string' ? { url: image, publicId: '' } : image)
+                .filter((image) => image?.url)
+            : [];
+          if (property.imageUrl && !images.some((image) => image.url === property.imageUrl)) {
+            images.unshift({ url: property.imageUrl, publicId: property.imagePublicId || '' });
+          }
+          return images;
+        })(),
         imageUrl: property.imageUrl || '',
         imagePublicId: property.imagePublicId || '',
+        videoLink: property.videoLink || '',
+        buildingStatus: property.buildingStatus || '',
         status: property.status || 'available',
         budgetRange: property.budgetRange || 'mid',
         location: property.location || '',
@@ -225,16 +244,23 @@ useEffect(() => {
   });
 };
 
-  const handleImageUpload = (imageData) => {
+  const handleImagesUpload = (images) => {
+    const nextImages = Array.isArray(images) ? images : [];
+    const primaryImage = nextImages[0] || {};
     setFormData((prev) => ({
       ...prev,
-      imageUrl: imageData.url || '',
-      imagePublicId: imageData.publicId || '',
+      images: nextImages,
+      imageUrl: primaryImage.url || '',
+      imagePublicId: primaryImage.publicId || '',
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (uploading) {
+      toast.error('Please wait for photo uploads to finish');
+      return;
+    }
 
     const required = ['title', 'city', 'area', 'areaSqft'];
     if (categoryTab === 'residential_buy' || categoryTab === 'commercial_buy') {
@@ -253,6 +279,7 @@ useEffect(() => {
     const submitData = {
       ...formData,
       categoryTab,
+      images: formData.images,
       tenantPreferences: Array.isArray(formData.tenantPreferences) ? formData.tenantPreferences : [],
       foodPreferences: Array.isArray(formData.foodPreferences) ? formData.foodPreferences : [],
       areaSqft: Number(formData.areaSqft) || 0,
@@ -337,14 +364,25 @@ useEffect(() => {
 
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             <ImageUpload
-              currentImage={formData.imageUrl}
-              onImageUpload={handleImageUpload}
+              images={formData.images}
+              onImagesChange={handleImagesUpload}
               uploading={uploading}
               setUploading={setUploading}
             />
 
             {/* Common: Title, Internal Name, City, Area, SubType */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {property && (
+                <Field label="Property ID" required>
+                  <input
+                    type="text"
+                    name="propertyId"
+                    value={formData.propertyId}
+                    onChange={handleChange}
+                    className={INPUT_CLASS}
+                  />
+                </Field>
+              )}
               <Field label="Public Property Title" required>
                 <input
                   type="text"
@@ -383,7 +421,7 @@ useEffect(() => {
                   name="city"
                   value={formData.city}
                   onChange={handleChange}
-                  placeholder="Indore"
+                  placeholder="Surat"
                   className={INPUT_CLASS}
                 />
               </Field>
@@ -411,6 +449,27 @@ useEffect(() => {
                     <option key={s} value={s}>{SUBTYPE_LABEL[s] || s}</option>
                   ))}
                 </select>
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Field label="Building Status">
+                <select name="buildingStatus" value={formData.buildingStatus} onChange={handleChange} className={INPUT_CLASS}>
+                  <option value="">Select building status</option>
+                  <option value="under_construction">Under Construction</option>
+                  <option value="new_booking">New Booking</option>
+                  <option value="resale_property">Resale Property</option>
+                </select>
+              </Field>
+              <Field label="Video Link">
+                <input
+                  type="url"
+                  name="videoLink"
+                  value={formData.videoLink}
+                  onChange={handleChange}
+                  placeholder="https://..."
+                  className={INPUT_CLASS}
+                />
               </Field>
             </div>
 
@@ -477,7 +536,7 @@ useEffect(() => {
                 <Field label="Configuration" required>
                   <select name="configuration" value={formData.configuration} onChange={handleChange} className={INPUT_CLASS}>
                     <option value="">Select configuration</option>
-                    {RESIDENTIAL_CONFIGS.map((c) => (
+                    {RESIDENTIAL_RENT_CONFIGS.map((c) => (
                       <option key={c} value={c}>{c.toUpperCase().replace('BHK', ' BHK')}</option>
                     ))}
                   </select>

@@ -14,12 +14,12 @@ import {
 } from '@/lib/auth/session';
 
 const ALLOWED_UPDATE_FIELDS = [
-  'title', 'internalName',
+  'propertyId', 'title', 'internalName',
   'tenantPreferences', 'foodPreferences',
   'city', 'area', 'propertyType', 'propertySubType',
   'budgetRange', 'price', 'configuration', 'spaceSize', 'location',
   'areaSqft', 'furnishing', 'status', 'description', 'features',
-  'imageUrl', 'imagePublicId', 'images', 'ownerPhone', 'ownerName', 'source',
+  'imageUrl', 'imagePublicId', 'images', 'videoLink', 'buildingStatus', 'ownerPhone', 'ownerName', 'source',
   'dimensions', 'facing', 'floor', 'monthlyRent', 'securityDeposit',
   'setupType', 'availableFrom', 'categoryTab',
   'brokerage', 'brokerageAmount',
@@ -79,9 +79,51 @@ for (const key of ALLOWED_UPDATE_FIELDS) {
   if (key === 'status' && !isOwner) continue;  // ← ignore status changes from non-owners
   cleanBody[key] = body[key];
 }
-
+   if (body.propertyId !== undefined) {
+     cleanBody.propertyId = String(body.propertyId).trim();
+     if (!cleanBody.propertyId) {
+       return NextResponse.json({ error: 'Property ID cannot be empty' }, { status: 400 });
+     }
+   }
+    if (cleanBody.images !== undefined && !Array.isArray(cleanBody.images)) {
+      return NextResponse.json({ error: 'Property images must be an array' }, { status: 400 });
+    }
+    if (cleanBody.images?.length > 10) {
+      return NextResponse.json({ error: 'A property can have up to 10 photos' }, { status: 400 });
+    }
+    if (cleanBody.images) {
+      cleanBody.images = cleanBody.images.map((image) =>
+        typeof image === 'string' ? { url: image, publicId: '' } : image
+      );
+      if (cleanBody.images.some((image) => !image?.url)) {
+        return NextResponse.json({ error: 'Each property photo must include a URL' }, { status: 400 });
+      }
+    }
+    if (cleanBody.images?.length) {
+      cleanBody.imageUrl = cleanBody.images[0].url;
+      cleanBody.imagePublicId = cleanBody.images[0].publicId || '';
+    } else if (cleanBody.images) {
+      cleanBody.imageUrl = '';
+      cleanBody.imagePublicId = '';
+    }
     const existing = await Property.findById(id);
     if (!existing) return NextResponse.json({ error: 'Property not found' }, { status: 404 });
+
+    if (
+      cleanBody.propertyId &&
+      cleanBody.propertyId !== existing.propertyId &&
+      !/^HH\d+$/.test(cleanBody.propertyId)
+    ) {
+      return NextResponse.json({ error: 'Property ID must use the HH### format' }, { status: 400 });
+    }
+
+    if (
+      cleanBody.propertyId &&
+      cleanBody.propertyId !== existing.propertyId &&
+      (await Property.exists({ propertyId: cleanBody.propertyId }))
+    ) {
+      return NextResponse.json({ error: 'Property ID is already in use' }, { status: 409 });
+    }
 
     const previousStatus = existing.status;
 

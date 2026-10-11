@@ -31,6 +31,7 @@ function transformLead(lead) {
     phone: lead.phone,
     phoneNumber: lead.phoneNumber || 'Not provided',
     email: lead.email || null,
+    source: lead.source || 'whatsapp_bot',
     leadType: lead.leadType,
     preferredLanguage: lead.preferredLanguage || 'en',
     city: lead.city || 'Not provided',
@@ -83,7 +84,7 @@ export async function GET(request, { params }) {
 
     const lead = await Lead.findById(id)
       .populate('matchedProperties', 'propertyId title city area price configuration imageUrl status')
-      .populate('interested', 'propertyId title city area price configuration imageUrl status')
+      .populate('interested', 'propertyId title internalName city area price configuration imageUrl status')
       .populate('ownedPropertyDraft', 'propertyId title city area price configuration imageUrl status images');
 
     if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
@@ -152,7 +153,7 @@ console.log('[lead PUT] raw body:', JSON.stringify(body));
       context: 'query',
     })
       .populate('matchedProperties', 'propertyId title city area price configuration imageUrl status')
-      .populate('interested', 'propertyId title city area price configuration imageUrl status')
+      .populate('interested', 'propertyId title internalName city area price configuration imageUrl status')
       .populate('ownedPropertyDraft', 'propertyId title city area price configuration imageUrl status images');
       console.log('[lead PUT] saved assignedTo:', lead?.assignedTo);
     if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });

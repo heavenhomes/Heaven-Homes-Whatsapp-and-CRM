@@ -604,7 +604,12 @@ export default function LeadsPage() {
         fetchLeads();
         fetchStats();
       } else {
-        toast.error(json.error || "Failed to add lead");
+        toast.error(
+          json.message ||
+            json.details?.join(", ") ||
+            json.error ||
+            "Failed to add lead"
+        );
       }
     } catch (err) {
       console.error(err);
@@ -792,7 +797,7 @@ export default function LeadsPage() {
   return (
     <div className="p-4 md:p-6 bg-[#f8faf7] min-h-screen">
       {/* Heading + action buttons */}
-      <div className="mb-6 mt-16 md:mt-0">
+      <div className="mb-6">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a2e1a] flex items-center gap-2">
@@ -890,8 +895,8 @@ export default function LeadsPage() {
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-[#e8f0e6] overflow-hidden shadow-sm">
-        <div className="responsive-table-wrapper overflow-hidden">
-          <table className="responsive-table w-full table-fixed">
+        <div className="responsive-table-wrapper overflow-x-auto">
+          <table className="responsive-table w-full min-w-[900px] table-fixed">
             <thead>
               <tr className="bg-[#fafffa]">
                 <Th>Lead Name</Th>

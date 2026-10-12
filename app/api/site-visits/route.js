@@ -123,6 +123,15 @@ export async function POST(request) {
       source: body.source || 'admin',
     });
 
+    if (visit.status === 'completed') {
+      await Lead.findByIdAndUpdate(lead._id, {
+        $set: {
+          currentStatus: 'site_visit_completed',
+          lastActivityAt: new Date(),
+        },
+      });
+    }
+
     await logActivity(request, {
       action: 'site_visit.created',
       category: 'site_visit',

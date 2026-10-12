@@ -175,7 +175,7 @@ export default function Dashboard() {
   return (
     <div className="p-4 md:p-6 bg-[#f8faf7] min-h-screen">
       {/* Page Header */}
-      <div className="mb-6 mt-16 md:mt-0">
+      <div className="mb-6">
         <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a2e1a]">
           Dashboard
         </h1>

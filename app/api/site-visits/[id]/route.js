@@ -1,5 +1,6 @@
 import dbConnect, { isDbConnected } from "@/lib/mongodb";
 import SiteVisit from "@/lib/models/SiteVisit";
+import Lead from "@/lib/models/Lead";
 import { NextResponse } from "next/server";
 
 function isValidObjectId(id) {
@@ -60,6 +61,14 @@ export async function PUT(request, { params }) {
       returnDocument: "after",
       runValidators: true,
     });
+    if (visit.status === "completed") {
+      await Lead.findByIdAndUpdate(visit.lead, {
+        $set: {
+          currentStatus: "site_visit_completed",
+          lastActivityAt: new Date(),
+        },
+      });
+    }
     let description = `Site visit updated: ${visit.leadName} → ${visit.propertyTitle}`;
     let severity = "info";
 

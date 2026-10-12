@@ -83,8 +83,8 @@ export async function GET(request, { params }) {
     }
 
     const lead = await Lead.findById(id)
-      .populate('matchedProperties', 'propertyId title city area price configuration imageUrl status')
-      .populate('interested', 'propertyId title internalName city area price configuration imageUrl status')
+      .populate('matchedProperties', 'propertyId title city area price configuration imageUrl images status')
+      .populate('interested', 'propertyId title internalName city area price configuration imageUrl images status')
       .populate('ownedPropertyDraft', 'propertyId title city area price configuration imageUrl status images');
 
     if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });

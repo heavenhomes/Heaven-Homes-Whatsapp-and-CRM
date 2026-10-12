@@ -148,7 +148,7 @@ export default function ManageTeamPage() {
   return (
     <div className="p-4 md:p-6 bg-[#f8faf7] min-h-screen">
       {/* Header */}
-      <div className="mb-6 mt-16 md:mt-0">
+      <div className="mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a2e1a] flex items-center gap-2">

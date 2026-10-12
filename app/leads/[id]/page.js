@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import ImageGalleryModal from '@/components/Properties/ImageGalleryModal';
 import {
   ArrowLeft, Phone, MessageSquare,
   Star, Building2, Image as ImageIcon,
@@ -105,6 +106,7 @@ export default function LeadDetailPage() {
     visits: [],
   });
   const [subLoading, setSubLoading] = useState(false);
+  const [selectedGallery, setSelectedGallery] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -189,7 +191,14 @@ export default function LeadDetailPage() {
 
   return (
     <div className="p-4 md:p-6 bg-[#f8faf7] min-h-screen">
-      <div className="mb-6 mt-16 md:mt-0">
+      {selectedGallery && (
+        <ImageGalleryModal
+          images={selectedGallery.images}
+          title={selectedGallery.title}
+          onClose={() => setSelectedGallery(null)}
+        />
+      )}
+      <div className="mb-6">
         <button
           onClick={() => router.push('/leads')}
           className="text-sm text-[#6a7f6a] hover:text-[#1a2e1a] mb-2 inline-flex items-center gap-1.5 transition-colors"
@@ -279,6 +288,15 @@ export default function LeadDetailPage() {
               <InterestedTab
                 interests={subData.interested}
                 selectedProperty={lead.interested}
+                onOpenGallery={(property) => {
+                  const images = Array.isArray(property.images) ? property.images : [];
+                  setSelectedGallery({
+                    images: property.imageUrl
+                      ? [property.imageUrl, ...images]
+                      : images,
+                    title: property.title || 'Property',
+                  });
+                }}
               />
             )}
             {activeTab === 'conversation' && (
@@ -385,7 +403,7 @@ function EnquiryTab({ enquiries }) {
   );
 }
 
-function InterestedTab({ interests, selectedProperty }) {
+function InterestedTab({ interests, selectedProperty, onOpenGallery }) {
   const list = Array.isArray(interests) ? interests : [];
   const selectedPropertyId =
     typeof selectedProperty === 'object' && selectedProperty !== null
@@ -421,6 +439,8 @@ function InterestedTab({ interests, selectedProperty }) {
         const area = p?.area || it.propertySnapshot?.area || '';
         const price = p?.price || it.propertySnapshot?.price || 0;
         const image = p?.imageUrl || it.propertySnapshot?.imageUrl || null;
+        const images = p?.images || it.propertySnapshot?.images || [];
+        const galleryImages = image ? [image, ...images] : images;
 
         return (
           <div
@@ -428,11 +448,22 @@ function InterestedTab({ interests, selectedProperty }) {
             className="border border-[#eef5ec] rounded-xl p-3 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-[#fafffa] transition-colors"
           >
             {image ? (
-              <img
-                src={image}
-                alt={publicTitle}
-                className="w-full sm:w-16 h-40 sm:h-16 rounded-xl object-cover flex-shrink-0 border border-[#eef5ec]"
-              />
+              <button
+                type="button"
+                onClick={() => onOpenGallery({
+                  title: publicTitle,
+                  imageUrl: image,
+                  images: galleryImages,
+                })}
+                className="w-full sm:w-20 h-40 sm:h-20 flex-shrink-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]"
+                aria-label={`View images for ${publicTitle}`}
+              >
+                <img
+                  src={image}
+                  alt={publicTitle}
+                  className="w-full h-full rounded-xl object-cover border border-[#eef5ec]"
+                />
+              </button>
             ) : (
               <div className="w-full sm:w-16 h-40 sm:h-16 rounded-xl bg-[#f0f7ef] flex items-center justify-center flex-shrink-0 border border-[#eef5ec]">
                 <ImageIcon className="w-6 h-6 text-[#6a7f6a]" />

@@ -65,8 +65,8 @@ export async function GET(request) {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('matchedProperties', 'propertyId title city area price configuration imageUrl status')
-        .populate('interested', 'propertyId title city area price configuration imageUrl status')
+        .populate('matchedProperties', 'propertyId title city area price configuration imageUrl images status')
+        .populate('interested', 'propertyId title city area price configuration imageUrl images status')
         .populate('ownedPropertyDraft', 'propertyId title city area price configuration imageUrl status images'),
       Lead.countDocuments(query),
     ]);
@@ -132,7 +132,8 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    if (!body.phone) {
+    const phone = String(body.phone || '').trim();
+    if (!phone) {
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
     }
 
@@ -140,6 +141,7 @@ export async function POST(request) {
     for (const key of ALLOWED_LEAD_FIELDS) {
       if (key !== 'phone' && body[key] !== undefined) cleanBody[key] = body[key];
     }
+    if (!cleanBody.interested) delete cleanBody.interested;
     if (body.source === 'manual') {
       const category = cleanBody.propertyCategory;
       const purchaseType = cleanBody.purchaseType;
@@ -172,10 +174,10 @@ export async function POST(request) {
       cleanBody.step = 'completed';
     }
 
-    const existingLead = await Lead.findOne({ phone: body.phone }).select('_id').lean();
+    const existingLead = await Lead.findOne({ phone }).select('_id').lean();
     const update = {
       $set: cleanBody,
-      $setOnInsert: { phone: body.phone },
+      $setOnInsert: { phone },
     };
 
     if (body.source === 'manual' && cleanBody.propertyCategory) {
@@ -214,7 +216,7 @@ export async function POST(request) {
     }
 
     const lead = await Lead.findOneAndUpdate(
-      { phone: body.phone },
+      { phone },
       update,
       { returnDocument: 'after', upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );

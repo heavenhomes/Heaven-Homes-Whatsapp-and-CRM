@@ -165,6 +165,7 @@ function pushInterest(lead, property) {
       price: property.price,
       configuration: property.configuration,
       imageUrl: property.imageUrl,
+      images: property.images || [],
       internalName: property.internalName || '',
     },
     expressedAt: new Date(),
@@ -943,20 +944,17 @@ const PROPERTY_CARD_HEADER = {
   },
 };
 
+const PROPERTY_MESSAGE_DELAY_MS = 900;
+
+function waitForPropertyMessage() {
+  return new Promise((resolve) => setTimeout(resolve, PROPERTY_MESSAGE_DELAY_MS));
+}
+
 async function sendPropertyCard(
   phone,
   property,
   { isFallback = false, lang = 'en', showHeader = true } = {}
 ) {
-  if (showHeader) {
-    const header = t(
-      lang,
-      isFallback ? PROPERTY_CARD_HEADER.fallback : PROPERTY_CARD_HEADER.match
-    );
-    await sendText(phone, header);
-  }
-
-  const caption = propertyCardCaption(property, lang);
   const imageUrls = (property.images || [])
     .map((image) => typeof image === 'string' ? image : image?.url)
     .filter(Boolean);
@@ -965,13 +963,23 @@ async function sendPropertyCard(
   }
 
   if (imageUrls.length) {
-    for (const imageUrl of imageUrls) {
+    for (const [index, imageUrl] of imageUrls.entries()) {
+      if (index > 0) await waitForPropertyMessage();
       await sendImage(phone, imageUrl);
     }
-    await sendText(phone, caption);
-  } else {
-    await sendText(phone, caption);
   }
+
+  await waitForPropertyMessage();
+  if (showHeader) {
+    const header = t(
+      lang,
+      isFallback ? PROPERTY_CARD_HEADER.fallback : PROPERTY_CARD_HEADER.match
+    );
+    await sendText(phone, header);
+    await waitForPropertyMessage();
+  }
+
+  await sendText(phone, propertyCardCaption(property, lang));
 }
 
 // ---------------------------------------------------------------------------
@@ -1028,9 +1036,9 @@ const STEPS = {
   askSearchMode: {
     kind: 'buttons',
     prompt: {
-      en: 'How would you like to proceed with your property search?\n\n🔑 Search by Property ID\n🏘️ Explore Other Properties (Buy / Rent)',
-      hi: 'आप अपनी प्रॉपर्टी की खोज कैसे जारी रखना चाहेंगे?\n\n🔑 प्रॉपर्टी आईडी से खोजें\n🏘️ अन्य प्रॉपर्टी देखें (खरीदें / किराए पर लें)',
-      gu: 'તમે તમારી પ્રોપર્ટીની શોધ કેવી રીતે આગળ વધારવા માંગો છો?\n\n🔑 પ્રોપર્ટી ID થી શોધો\n🏘️ અન્ય પ્રોપર્ટી જુઓ (ખરીદો / ભાડે)',
+      en: '🏡 How would you like to proceed with your property search?\n\n🔑 Search by Property ID\n🏘️ Explore Other Properties (Buy / Rent)',
+      hi: '🏡 आप अपनी प्रॉपर्टी की खोज कैसे जारी रखना चाहेंगे?\n\n🔑 प्रॉपर्टी आईडी से खोजें\n🏘️ अन्य प्रॉपर्टी देखें (खरीदें / किराए पर लें)',
+      gu: '🏡 તમે તમારી પ્રોપર્ટીની શોધ કેવી રીતે આગળ વધારવા માંગો છો?\n\n🔑 પ્રોપર્ટી ID થી શોધો\n🏘️ અન્ય પ્રોપર્ટી જુઓ (ખરીદો / ભાડે)',
     },
     options: [
       {
@@ -1075,6 +1083,7 @@ const STEPS = {
             hi: 'अभी Property ID की जांच नहीं हो सकी। कृपया फिर से कोशिश करें।',
             gu: 'હમણાં Property ID તપાસી શકાયું નથી. કૃપા કરીને ફરીથી પ્રયાસ કરો.',
           }),
+          buttons: [getMainMenuCtaButton(lang)],
         };
       }
       return {
@@ -1083,6 +1092,7 @@ const STEPS = {
           hi: 'इस ID से कोई उपलब्ध प्रॉपर्टी नहीं मिली। कृपया ID जांचकर फिर से दर्ज करें।',
           gu: 'આ ID સાથે કોઈ ઉપલબ્ધ પ્રોપર્ટી મળી નથી. કૃપા કરીને ID તપાસીને ફરીથી દાખલ કરો.',
         }),
+        buttons: [getMainMenuCtaButton(lang)],
       };
     },
     apply: async (lead) => {
@@ -1201,7 +1211,7 @@ const STEPS = {
     options: [
       { id: 'purchase', title: { en: '🏡 Buy Property', hi: '🏡 प्रॉपर्टी खरीदें', gu: '🏡 પ્રોપર્ટી ખરીદો' } },
       { id: 'rent_lease', title: { en: '🔑 Rental Property', hi: '🔑 किराया खोजें', gu: '🔑 ભાડું શોધો' } },
-      { id: 'rent_out', title: { en: '🏠 Rent Out', hi: '🏠 किराए पर दें', gu: '🏠 ભાડે આપો' } },
+      { id: 'rent_out', title: { en: '🏠 Rent/Sell Out', hi: '🏠 किराए पर दें', gu: '🏠 ભાડે આપો' } },
     ],
     apply: async (lead, value) => {
       if (value === 'rent_out') {
@@ -2052,8 +2062,8 @@ async function sendStepPrompt(phone, stepId, step, lead) {
       showHeader: !lead.propertyIdSearch,
     });
 
-    await new Promise((r) => setTimeout(r, 900));
-
+    await waitForPropertyMessage();
+ 
     const buttons = showingPropertyCtx.buttons.map((o) => ({ id: o.id, title: t(lang, o.title) }));
     await sendButtons(phone, t(lang, promptTri), buttons);
     return;
@@ -2092,21 +2102,15 @@ async function sendWelcomeAndLanguagePrompt(phone, lead) {
   await sendStepPrompt(phone, 'askLanguage', STEPS.askLanguage, lead);
 }
 
-function getRestartCtaButton(lang) {
+function getMainMenuCtaButton(lang) {
   return {
-    id: 'restart',
-    title: t(lang, { en: '🔄 Restart', hi: '🔄 पुनः आरंभ करें', gu: '🔄 ફરી શરૂ કરો' }),
+    id: 'main_menu',
+    title: t(lang, { en: '📋 Main Menu', hi: '📋 मुख्य मेनू', gu: '📋 મુખ્ય મેનૂ' }),
   };
 }
 
 function getEndFlowCtaButtons(lang) {
-  return [
-    getRestartCtaButton(lang),
-    {
-      id: 'main_menu',
-      title: t(lang, { en: '📋 Main Menu', hi: '📋 मुख्य मेनू', gu: '📋 મુખ્ય મેનૂ' }),
-    },
-  ];
+  return [getMainMenuCtaButton(lang)];
 }
 
 async function sendTerminalMessage(phone, lead, text, terminalTag, ctaButtons) {
@@ -2366,7 +2370,7 @@ async function handleMessage(phone, incoming) {
       hi: 'आपकी पूछताछ के लिए धन्यवाद।\n\nटीम हेवन होम्स ❤️',
       gu: 'તમારી પૂછપરછ બદલ આભાર.\n\nટીમ હેવન હોમ્સ ❤️',
     });
-    await sendTerminalMessage(phone, lead, msg, 'stopFollowUp', [getRestartCtaButton(lang)]);
+    await sendTerminalMessage(phone, lead, msg, 'stopFollowUp', [getMainMenuCtaButton(lang)]);
     return;
   }
 
@@ -2388,11 +2392,25 @@ async function handleMessage(phone, incoming) {
   }
 
   if (interactiveId === 'main_menu') {
+    const wasUnsubscribed = lead.followUpStatus === 'unsubscribed';
     resetLeadProgress(lead);
+    if (wasUnsubscribed) lead.followUpStatus = 'unsubscribed';
     lead.step = 'askSearchMode';
     pushStatusChange(lead, 'active', 'whatsapp_bot', 'Returned to main menu');
     await lead.save();
     await sendStepPrompt(phone, 'askSearchMode', STEPS.askSearchMode, lead);
+    return;
+  }
+
+  if (interactiveId === 'fu_show_properties') {
+    touchLeadActivity(lead);
+    const properties = await findMatchingProperties(lead);
+    lead.matchedProperties = properties.map((property) => property._id);
+    lead.currentPropertyIndex = 0;
+    lead.propertyIdSearch = false;
+    lead.step = properties.length ? 'showing_property' : 'askSearchMode';
+    await lead.save();
+    await sendStepPrompt(phone, lead.step, STEPS[lead.step], lead);
     return;
   }
 
@@ -2489,6 +2507,10 @@ async function handleMessage(phone, incoming) {
         }
 
         const errMsg = result.text;
+        if (result.buttons) {
+          await sendTerminalMessage(phone, lead, errMsg, `${lead.step}_invalid`, result.buttons);
+          return;
+        }
         pushConversation(lead, { direction: 'out', type: 'text', text: errMsg });
         await lead.save();
         await sendText(phone, errMsg);

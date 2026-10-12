@@ -23,7 +23,7 @@ export async function GET(request, { params }) {
       .select('interestHistory')
       .populate({
         path: 'interestHistory.property',
-        select: 'propertyId title internalName city area price configuration imageUrl status',
+        select: 'propertyId title internalName city area price configuration imageUrl images status',
         strictPopulate: false,
       })
       .lean();

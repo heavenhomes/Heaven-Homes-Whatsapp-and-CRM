@@ -1,10 +1,16 @@
 'use client';
 import { useAuth } from '@/lib/auth/useAuth';
 import { useEffect, useState } from 'react';
+import ImageGalleryModal from '@/components/Properties/ImageGalleryModal';
 import {
   Home, FolderOpen, MapPin, Pencil, CheckCircle, XCircle,
   User, IndianRupee, Image as ImageIcon,
 } from 'lucide-react';
+
+function getPropertyImage(property) {
+  const firstImage = property.images?.[0];
+  return property.imageUrl || (typeof firstImage === 'string' ? firstImage : firstImage?.url);
+}
 
 export default function RentOutListingsPage() {
   const { isOwner } = useAuth();
@@ -15,7 +21,16 @@ export default function RentOutListingsPage() {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, pages: 1 });
   const [selected, setSelected] = useState(null);
+  const [selectedGallery, setSelectedGallery] = useState(null);
   const [toast, setToast] = useState(null);
+
+  const openGallery = (property) => {
+    const images = Array.isArray(property.images) ? property.images : [];
+    setSelectedGallery({
+      images: property.imageUrl ? [property.imageUrl, ...images] : images,
+      title: property.title || 'Property',
+    });
+  };
 
   const fetchListings = async () => {
     setLoading(true);
@@ -71,8 +86,15 @@ export default function RentOutListingsPage() {
 
   return (
     <div className="p-4 md:p-6 bg-[#f8faf7] min-h-screen">
+      {selectedGallery && (
+        <ImageGalleryModal
+          images={selectedGallery.images}
+          title={selectedGallery.title}
+          onClose={() => setSelectedGallery(null)}
+        />
+      )}
       {/* Page Header */}
-      <div className="mb-6 mt-16 md:mt-0">
+      <div className="mb-6">
         <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a2e1a]">
           Rent Out Property Requests
         </h1>
@@ -144,8 +166,15 @@ export default function RentOutListingsPage() {
                 listings.map((p) => (
                   <tr key={p._id} className="border-t border-[#eef5ec] hover:bg-[#fafffa] transition-colors">
                     <td className="px-5 py-3">
-                      {p.imageUrl ? (
-                        <img src={p.imageUrl} alt={p.title} className="w-14 h-14 rounded-xl object-cover border border-[#e8f0e6]" />
+                      {getPropertyImage(p) ? (
+                        <button
+                          type="button"
+                          onClick={() => openGallery(p)}
+                          className="block rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]"
+                          aria-label={`View images for ${p.title || 'property'}`}
+                        >
+                          <img src={getPropertyImage(p)} alt={p.title} className="w-20 h-20 rounded-xl object-cover border border-[#e8f0e6] shadow-sm" />
+                        </button>
                       ) : (
                         <div className="w-14 h-14 rounded-xl bg-[#f0f7ef] flex items-center justify-center border border-[#e8f0e6]">
                           <ImageIcon className="w-5 h-5 text-[#a8bfa8]" />
@@ -239,8 +268,15 @@ export default function RentOutListingsPage() {
             listings.map((p) => (
               <div key={p._id} className="p-4 space-y-3">
                 <div className="flex gap-3">
-                  {p.imageUrl ? (
-                    <img src={p.imageUrl} alt={p.title} className="w-16 h-16 rounded-xl object-cover border border-[#e8f0e6] flex-shrink-0" />
+                  {getPropertyImage(p) ? (
+                    <button
+                      type="button"
+                      onClick={() => openGallery(p)}
+                      className="flex-shrink-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]"
+                      aria-label={`View images for ${p.title || 'property'}`}
+                    >
+                      <img src={getPropertyImage(p)} alt={p.title} className="w-20 h-20 rounded-xl object-cover border border-[#e8f0e6] shadow-sm" />
+                    </button>
                   ) : (
                     <div className="w-16 h-16 rounded-xl bg-[#f0f7ef] flex items-center justify-center border border-[#e8f0e6] flex-shrink-0">
                       <ImageIcon className="w-5 h-5 text-[#a8bfa8]" />
@@ -357,15 +393,25 @@ export default function RentOutListingsPage() {
             </div>
 
             <div className="p-4 sm:p-6">
-              {selected.images?.length > 0 ? (
+              {selected.images?.length > 0 || selected.imageUrl ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6">
-                  {selected.images.map((img, i) => (
-                    <img
+                  {(selected.images?.length
+                    ? selected.images
+                    : [selected.imageUrl]
+                  ).map((img, i) => (
+                    <button
                       key={i}
-                      src={img.url}
-                      alt=""
-                      className="w-full h-24 object-cover rounded-xl border border-[#e8f0e6]"
-                    />
+                      type="button"
+                      onClick={() => openGallery(selected)}
+                      className="overflow-hidden rounded-xl border border-[#e8f0e6] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]"
+                      aria-label={`View property image ${i + 1}`}
+                    >
+                      <img
+                        src={typeof img === 'string' ? img : img.url}
+                        alt={`${selected.title || 'Property'} ${i + 1}`}
+                        className="w-full h-28 object-cover transition-transform hover:scale-105"
+                      />
+                    </button>
                   ))}
                 </div>
               ) : (

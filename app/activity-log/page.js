@@ -141,7 +141,7 @@ export default function ActivityLogPage() {
   return (
     <div className="p-4 md:p-6 bg-[#f8faf7] min-h-screen">
       {/* Header */}
-      <div className="mb-6 mt-16 md:mt-0 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a2e1a] flex items-center gap-2">
             <span className="w-2 h-7 sm:h-8 bg-[#2d7a3a] rounded-full mr-2 flex-shrink-0" />

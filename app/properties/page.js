@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import PropertyModal from '@/components/Properties/PropertyModal';
 import VerifyPropertiesDrawer from '@/components/Properties/VerifyPropertiesDrawer';
+import ImageGalleryModal from '@/components/Properties/ImageGalleryModal';
 import {
   Search,
   Plus,
@@ -70,7 +71,7 @@ export default function PropertiesPage() {
   const [filterMinPrice, setFilterMinPrice] = useState('');
   const [filterMaxPrice, setFilterMaxPrice] = useState('');
 
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedGallery, setSelectedGallery] = useState(null);
   const [imageErrors, setImageErrors] = useState({});
   const [pagination, setPagination] = useState({
     total: 0,
@@ -221,6 +222,14 @@ export default function PropertiesPage() {
     setImageErrors((prev) => ({ ...prev, [propertyId]: true }));
   };
 
+  const openPropertyGallery = (property) => {
+    const images = Array.isArray(property.images) ? property.images : [];
+    const galleryImages = property.imageUrl
+      ? [property.imageUrl, ...images]
+      : images;
+    setSelectedGallery({ images: galleryImages, title: property.title || 'Property' });
+  };
+
   // Called by the drawer after approve/reject so the parent reflects the change
   const handleVerificationChanged = () => {
     fetchPendingCount();
@@ -273,30 +282,16 @@ export default function PropertiesPage() {
   return (
     <div className="p-4 md:p-6 bg-[#f8faf7] min-h-screen">
       {/* Image preview modal */}
-      {selectedImage && (
-        <div
-          className="fixed inset-0 bg-[#1a2e1a]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedImage(null)}
-        >
-          <div className="relative max-w-4xl max-h-full">
-            <button
-              onClick={() => setSelectedImage(null)}
-              className="absolute -top-12 right-0 text-white hover:text-[#e8f5e6] transition-colors p-2"
-              aria-label="Close preview"
-            >
-              <X className="w-8 h-8" />
-            </button>
-            <img
-              src={selectedImage}
-              alt="Property"
-              className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
-            />
-          </div>
-        </div>
+      {selectedGallery && (
+        <ImageGalleryModal
+          images={selectedGallery.images}
+          title={selectedGallery.title}
+          onClose={() => setSelectedGallery(null)}
+        />
       )}
 
       {/* Page Header */}
-      <div className="mb-6 mt-16 md:mt-0">
+      <div className="mb-6">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold text-[#1a2e1a] flex items-center gap-2">
@@ -488,7 +483,7 @@ export default function PropertiesPage() {
                 <div
                   className="relative bg-[#f0f7ef] overflow-hidden flex-shrink-0 cursor-pointer"
                   style={{ height: `${IMAGE_HEIGHT}px`, width: '100%' }}
-                  onClick={() => showImage && setSelectedImage(property.imageUrl)}
+                  onClick={() => showImage && openPropertyGallery(property)}
                 >
                   {showImage ? (
                     <img

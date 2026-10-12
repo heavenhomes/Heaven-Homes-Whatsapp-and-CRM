@@ -10,7 +10,7 @@ const ALLOWED_LEAD_FIELDS = [
   'leadType', 'preferredLanguage', 'propertyCategory', 'purchaseType',
   'propertyType', 'propertySubType', 'configuration', 'budgetRange',
   'rentBudgetLabel', 'rentTypeLabel', 'timeline', 'furnishing',
-  'investmentType', 'siteVisit', 'shiftingDate', 'spaceSize',
+  'investmentType', 'siteVisit', 'spaceSize',
   'interested', 'ownedPropertyDraft', 'listingDraft',
   'step', 'cityAttempts', 'areaAttempts',
   'matchedProperties', 'currentPropertyIndex',
@@ -44,11 +44,12 @@ function transformLead(lead) {
     budgetRange: lead.budgetRange || 'Not provided',
     rentBudgetLabel: lead.rentBudgetLabel || null,
     rentTypeLabel: lead.rentTypeLabel || null,
-    timeline: lead.timeline || 'Not provided',
+    ...(lead.leadType === 'lister' || lead.propertyCategory === 'rent_out'
+      ? { timeline: lead.timeline || null }
+      : {}),
     furnishing: lead.furnishing || 'Not provided',
     investmentType: lead.investmentType || 'Not provided',
     siteVisit: lead.siteVisit || null,
-    shiftingDate: lead.shiftingDate || null,
     spaceSize: lead.spaceSize || null,
     step: lead.step,
     isCompleted: lead.step === 'completed',
@@ -128,6 +129,12 @@ console.log('[lead PUT] raw body:', JSON.stringify(body));
     }
     for (const key of CRM_FIELDS) {
       if (body[key] !== undefined) cleanBody[key] = body[key];
+    }
+    const nextLeadType = cleanBody.leadType ?? existing.leadType;
+    const nextCategory = cleanBody.propertyCategory ?? existing.propertyCategory;
+    if (nextLeadType !== 'lister' && nextCategory !== 'rent_out') {
+      delete cleanBody.timeline;
+      cleanBody.$unset = { ...cleanBody.$unset, timeline: 1 };
     }
 
     // If currentStatus is changing, append to statusHistory

@@ -139,18 +139,6 @@ const RENT_OUT_BUDGETS = [
   ["high", "₹20,000–₹40,000"],
   ["luxury", "Above ₹40,000"],
 ];
-const BUY_TIMELINES = [
-  ["immediately", "🚀 Immediately"],
-  ["within_1_month", "📆 Within 1 Month"],
-  ["within_3_months", "🗓️ Within 3 Months"],
-  ["just_exploring", "👀 Just Exploring"],
-];
-const RENT_TIMELINES = [
-  ["immediately", "🚀 Immediately"],
-  ["within_15_days", "📆 Within 15 Days"],
-  ["within_1_month", "🗓️ Within 1 Month"],
-  ["just_exploring", "👀 Just Exploring"],
-];
 const RENT_OUT_AVAILABILITY = [
   ["available_now", "🚀 Available Now"],
   ["within_15_days", "📆 Within 15 Days"],
@@ -256,11 +244,6 @@ export default function LeadsPage() {
       : form.purchaseType.endsWith("_buy")
         ? BUY_BUDGETS
         : [];
-  const timelineOptions = form.propertyCategory === "rent_out"
-    ? RENT_OUT_AVAILABILITY
-    : form.purchaseType.endsWith("_rent")
-      ? RENT_TIMELINES
-      : BUY_TIMELINES;
   const furnishingOptions = form.propertyCategory === "rent_out" || form.purchaseType === "commercial_rent"
       ? (form.leadType === "lister" ? FURNISHING_OPTIONS : COMMERCIAL_SETUP_OPTIONS)
     : FURNISHING_OPTIONS;
@@ -270,7 +253,7 @@ export default function LeadsPage() {
     form.propertySubType &&
     (form.propertySubType === "plot" || !configurationOptions.length || form.configuration) &&
     form.budgetRange &&
-    form.timeline &&
+    (form.propertyCategory !== "rent_out" || form.timeline) &&
     (!form.purchaseType.endsWith("_rent") || form.furnishing) &&
     (!form.purchaseType.endsWith("_buy") || form.investmentType) &&
     (form.propertyType !== "commercial" || form.spaceSize)
@@ -470,7 +453,7 @@ export default function LeadsPage() {
       "Lead Type",
       "Property Category",
       "Budget",
-      "Timeline",
+      "Availability",
       "Furnishing",
       "Assigned To",
       "Status",
@@ -570,7 +553,9 @@ export default function LeadsPage() {
     if (!form.purchaseType) return toast.error("Select residential or commercial");
     if (!form.propertySubType) return toast.error("Select a property subtype");
     if (!form.budgetRange) return toast.error("Select a budget");
-    if (!form.timeline) return toast.error("Select a timeline");
+    if (form.propertyCategory === "rent_out" && !form.timeline) {
+      return toast.error("Select availability");
+    }
     if (form.leadType === "seeker" && form.propertyType !== "commercial" && form.propertySubType !== "plot" && !form.configuration) {
       return toast.error("Select a configuration / BHK");
     }
@@ -1257,15 +1242,15 @@ export default function LeadsPage() {
                   </select>
                 </Field>
                 )}
-                {form.purchaseType && form.propertySubType && (
-                <Field label="Timeline / Availability">
+                {form.propertyCategory === "rent_out" && form.purchaseType && form.propertySubType && (
+                <Field label="Availability">
                   <select
                     value={form.timeline}
                     onChange={(e) => setForm((p) => ({ ...p, timeline: e.target.value }))}
                     className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
                   >
-                    <option value="">Select timeline</option>
-                    {timelineOptions.map(([value, label]) => <option key={value} value={label}>{label}</option>)}
+                    <option value="">Select availability</option>
+                    {RENT_OUT_AVAILABILITY.map(([value, label]) => <option key={value} value={label}>{label}</option>)}
                   </select>
                 </Field>
                 )}

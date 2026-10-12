@@ -10,7 +10,7 @@ const ALLOWED_LEAD_FIELDS = [
   'leadType', 'preferredLanguage', 'propertyCategory', 'purchaseType',
   'propertyType', 'propertySubType', 'configuration', 'budgetRange',
   'rentBudgetLabel', 'rentTypeLabel', 'timeline', 'furnishing',
-  'investmentType', 'siteVisit', 'shiftingDate', 'spaceSize',
+  'investmentType', 'siteVisit', 'spaceSize',
   'interested', 'ownedPropertyDraft', 'listingDraft',
   'step', 'cityAttempts', 'areaAttempts',
   'matchedProperties', 'currentPropertyIndex',
@@ -89,11 +89,12 @@ export async function GET(request) {
       budgetRange: lead.budgetRange || 'Not provided',
       rentBudgetLabel: lead.rentBudgetLabel || null,
       rentTypeLabel: lead.rentTypeLabel || null,
-      timeline: lead.timeline || 'Not provided',
+      ...(lead.leadType === 'lister' || lead.propertyCategory === 'rent_out'
+        ? { timeline: lead.timeline || null }
+        : {}),
       furnishing: lead.furnishing || 'Not provided',
       investmentType: lead.investmentType || 'Not provided',
       siteVisit: lead.siteVisit || null,
-      shiftingDate: lead.shiftingDate || null,
       spaceSize: lead.spaceSize || null,
       notes: lead.notes || '',
       step: lead.step,
@@ -169,6 +170,7 @@ export async function POST(request) {
         ? (isCommercial ? 'Commercial' : 'Residential')
         : '';
       cleanBody.city = 'Surat';
+      if (cleanBody.leadType !== 'lister') delete cleanBody.timeline;
     }
     if (body.source === 'manual' && body.step === undefined) {
       cleanBody.step = 'completed';
@@ -178,6 +180,9 @@ export async function POST(request) {
     const update = {
       $set: cleanBody,
       $setOnInsert: { phone },
+      ...(body.source === 'manual' && cleanBody.leadType !== 'lister'
+        ? { $unset: { timeline: 1 } }
+        : {}),
     };
 
     if (body.source === 'manual' && cleanBody.propertyCategory) {
@@ -206,7 +211,9 @@ export async function POST(request) {
           size: cleanBody.spaceSize || '',
           budgetRange: cleanBody.budgetRange || '',
           budgetLabel: cleanBody.rentBudgetLabel || cleanBody.budgetRange || '',
-          timeline: cleanBody.timeline || '',
+          ...(cleanBody.leadType === 'lister'
+            ? { timeline: cleanBody.timeline || '' }
+            : {}),
           buyingPlan: cleanBody.investmentType || '',
           furnishing: cleanBody.furnishing || '',
           spaceSize: cleanBody.spaceSize || '',

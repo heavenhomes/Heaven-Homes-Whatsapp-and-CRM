@@ -142,7 +142,9 @@ function pushEnquiry(lead) {
     size: sizeLabel,
     budgetRange: lead.budgetRange || '',
     budgetLabel: lead.rentBudgetLabel || lead.budgetRange || '',
-    timeline: lead.timeline || '',
+    ...(lead.leadType === 'lister' || lead.propertyCategory === 'rent_out'
+      ? { timeline: lead.timeline || '' }
+      : {}),
     buyingPlan: lead.investmentType || '',
     furnishing: lead.furnishing || '',
     spaceSize: lead.spaceSize || '',
@@ -1344,7 +1346,7 @@ const STEPS = {
       lead.spaceSize = value;
     },
     next: async (lead) =>
-      lead.propertyCategory === 'rent_lease' ? 'askMoveInTimeline' : 'askBudget',
+      lead.propertyCategory === 'rent_lease' ? 'CHECK_MATCH' : 'askBudget',
   },
 
   // =======================================================================
@@ -1481,7 +1483,7 @@ const STEPS = {
         above_50k: 'luxury',
       }[value];
     },
-    next: async () => 'askMoveInTimeline',
+    next: async () => 'CHECK_MATCH',
   },
 
   askBudget: {
@@ -1501,26 +1503,6 @@ const STEPS = {
     apply: async (lead, value) => {
       lead.budgetRange = value;
     },
-    next: async () => 'askPurchaseTimeline',
-  },
-
-  askPurchaseTimeline: {
-    kind: 'list',
-    prompt: {
-      en: '📅 When are you planning to purchase your property?',
-      hi: '📅 आप अपनी संपत्ति कब खरीदने की योजना बना रहे हैं?',
-      gu: '📅 તમે તમારી પ્રોપર્ટી ક્યારે ખરીદવાની યોજના બનાવો છો?',
-    },
-    listButton: { en: 'Choose', hi: 'चुनें', gu: 'પસંદ કરો' },
-    options: [
-      { id: 'immediately', title: { en: '🚀 Immediately', hi: '🚀 तुरंत', gu: '🚀 તરત જ' } },
-      { id: 'within_1_month', title: { en: '📆 Within 1 Month', hi: '📆 1 महीने में', gu: '📆 1 મહિનામાં' } },
-      { id: 'within_3_months', title: { en: '🗓️ Within 3 Months', hi: '🗓️ 3 महीने में', gu: '🗓️ 3 મહિનામાં' } },
-      { id: 'just_exploring', title: { en: '👀 Just Exploring', hi: '👀 बस देख रहे हैं', gu: '👀 ફક્ત જોઈ રહ્યા છીએ' } },
-    ],
-    apply: async (lead, value, title) => {
-      lead.timeline = title;
-    },
     next: async () => 'askSellFirstOrBuyDirect',
   },
 
@@ -1539,31 +1521,6 @@ const STEPS = {
       lead.investmentType = value;
     },
     next: async () => 'CHECK_MATCH',
-  },
-
-  askMoveInTimeline: {
-    kind: 'list',
-    prompt: {
-      en: 'When do you plan to move into your new home?',
-      hi: 'आप अपने नए घर में कब शिफ्ट होने की योजना बना रहे हैं?',
-      gu: 'તમે તમારા નવા ઘરમાં ક્યારે શિફ્ટ થવાની યોજના બનાવો છો?',
-    },
-    listButton: { en: 'Choose', hi: 'चुनें', gu: 'પસંદ કરો' },
-    options: [
-      { id: 'immediately', title: { en: '🚀 Immediately', hi: '🚀 तुरंत', gu: '🚀 તરત જ' } },
-      { id: 'within_15_days', title: { en: '📆 Within 15 Days', hi: '📆 15 दिनों में', gu: '📆 15 દિવસમાં' } },
-      { id: 'within_1_month', title: { en: '🗓️ Within 1 Month', hi: '🗓️ 1 महीने में', gu: '🗓️ 1 મહિનામાં' } },
-      { id: 'just_exploring', title: { en: '👀 Just Exploring', hi: '👀 बस देख रहे हैं', gu: '👀 ફક્ત જોઈ રહ્યા છીએ' } },
-    ],
-    apply: async (lead, value, title) => {
-      lead.timeline = title;
-    },
-    next: async (lead) => {
-      if (lead.purchaseType === 'commercial_rent' && !lead.spaceSize) {
-        return 'askCommercialSpaceSize';
-      }
-      return 'CHECK_MATCH';
-    },
   },
 
   CHECK_MATCH: {
@@ -1859,9 +1816,9 @@ const STEPS = {
   listLocation: {
     kind: 'text',
     prompt: {
-      en: 'Where is your property located?\nPlease type your City and Area/Locality. ✍️\nExample: Vijay Nagar, Indore\n\nNote: Simply type your location and send the message.',
-      hi: 'आपकी संपत्ति कहाँ स्थित है?\nकृपया शहर और क्षेत्र लिखें। ✍️\nउदाहरण: विजय नगर, इंदौर',
-      gu: 'તમારી પ્રોપર્ટી ક્યાં છે?\nકૃપા કરી શહેર અને વિસ્તાર લખો. ✍️\nઉદાહરણ: Vijay Nagar, Indore',
+      en: 'Where is your property located?\nPlease type your complete address House no.,/Block Name, City and Area/Locality. ✍️\nExample:3270, Near Hotel Rose, Vijay Nagar, Indore\n\nNote: Simply type your location and send the message.',
+      hi: 'आपकी संपत्ति कहाँ स्थित है?\nकृपया अपना पूर्ण पता टाइप करें। ✍️\nउदाहरण:3270, होटल रोज़ के पास, विजय नगर, इंदौर',
+      gu: 'તમારી પ્રોપર્ટી ક્યાં છે?\nકૃપા કરી તમારું પૂર્ણ પતા લખો. ✍️\nઉદાહરણ:3270, હોટેલ રોઝ નજીક, વિજય નગર, ઈન્દોર',
     },
     // Rent-out leads skip the generic city/area steps, so this is the ONLY place
     // we learn the property location. Require "Area, City" - a single word
@@ -2440,6 +2397,19 @@ async function handleMessage(phone, incoming) {
     };
     await sendText(phone, t(lang, welcomeTri));
 
+    await sendStepPrompt(phone, lead.step, STEPS[lead.step], lead);
+    return;
+  }
+
+  if (lead.step === 'askPurchaseTimeline' || lead.step === 'askMoveInTimeline') {
+    const nextStepId = lead.step === 'askPurchaseTimeline'
+      ? 'askSellFirstOrBuyDirect'
+      : lead.purchaseType === 'commercial_rent' && !lead.spaceSize
+        ? 'askCommercialSpaceSize'
+        : 'CHECK_MATCH';
+    lead.timeline = undefined;
+    lead.step = await advanceThroughSystemSteps(lead, nextStepId);
+    await lead.save();
     await sendStepPrompt(phone, lead.step, STEPS[lead.step], lead);
     return;
   }

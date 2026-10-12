@@ -21,7 +21,14 @@ export async function GET(request, { params }) {
     const lead = await Lead.findById(id).select('enquiries').lean();
     if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
 
-    const enquiries = Array.isArray(lead.enquiries) ? lead.enquiries : [];
+    const enquiries = Array.isArray(lead.enquiries)
+      ? lead.enquiries.map((enquiry) => {
+          if (enquiry.purpose === 'Rent Out') return enquiry;
+          const seekerEnquiry = { ...enquiry };
+          delete seekerEnquiry.timeline;
+          return seekerEnquiry;
+        })
+      : [];
     const sorted = [...enquiries].sort(
       (a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0)
     );

@@ -379,7 +379,9 @@ function EnquiryTab({ enquiries }) {
               value={e.configuration || e.size}
             />
             <Detail label="Budget" value={e.budgetLabel || e.budgetRange} />
-            <Detail label="Timeline" value={e.timeline} />
+            {e.purpose === 'Rent Out' && e.timeline && (
+              <Detail label="Availability" value={e.timeline} />
+            )}
             {e.buyingPlan && (
               <Detail
                 label="Buying Plan"
@@ -445,7 +447,7 @@ function InterestedTab({ interests, selectedProperty, onOpenGallery }) {
         return (
           <div
             key={it._id || `int-${idx}`}
-            className="border border-[#eef5ec] rounded-xl p-3 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-[#fafffa] transition-colors"
+            className="min-w-0 overflow-hidden border border-[#eef5ec] rounded-xl p-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[#fafffa] transition-colors"
           >
             {image ? (
               <button
@@ -455,17 +457,17 @@ function InterestedTab({ interests, selectedProperty, onOpenGallery }) {
                   imageUrl: image,
                   images: galleryImages,
                 })}
-                className="w-full sm:w-20 h-40 sm:h-20 flex-shrink-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]"
+                className="w-full h-40 md:w-20 md:h-20 flex-shrink-0 rounded-xl bg-[#f0f7ef] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]"
                 aria-label={`View images for ${publicTitle}`}
               >
                 <img
                   src={image}
                   alt={publicTitle}
-                  className="w-full h-full rounded-xl object-cover border border-[#eef5ec]"
+                  className="block w-full h-full rounded-xl object-contain border border-[#eef5ec]"
                 />
               </button>
             ) : (
-              <div className="w-full sm:w-16 h-40 sm:h-16 rounded-xl bg-[#f0f7ef] flex items-center justify-center flex-shrink-0 border border-[#eef5ec]">
+              <div className="w-full h-40 md:w-20 md:h-20 rounded-xl bg-[#f0f7ef] flex items-center justify-center flex-shrink-0 border border-[#eef5ec]">
                 <ImageIcon className="w-6 h-6 text-[#6a7f6a]" />
               </div>
             )}
@@ -507,7 +509,7 @@ function InterestedTab({ interests, selectedProperty, onOpenGallery }) {
               </p>
             </div>
 
-            <div className="text-left sm:text-right">
+            <div className="text-left md:text-right md:flex-shrink-0">
               <p className="text-sm font-semibold text-[#2d7a3a]">
                 ₹{Number(price).toLocaleString('en-IN')}
               </p>

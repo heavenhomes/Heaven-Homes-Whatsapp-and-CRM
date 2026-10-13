@@ -13,6 +13,7 @@ import {
   Phone,
   FolderOpen,
   XCircle,
+  Plus,
 } from 'lucide-react';
 
 const STATUS_TABS = [
@@ -34,6 +35,59 @@ export default function SiteVisitsPage() {
   const [pagination, setPagination] = useState({ total: 0, pages: 1 });
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [addingVisit, setAddingVisit] = useState(false);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [savingNewVisit, setSavingNewVisit] = useState(false);
+  const [leadOptions, setLeadOptions] = useState([]);
+  const [propertyOptions, setPropertyOptions] = useState([]);
+  const [newVisit, setNewVisit] = useState({ leadId: '', propertyId: '', date: '', time: '' });
+
+  const fetchAllOptions = async (endpoint) => {
+    const fetchPage = async (page) => {
+      const response = await fetch(`${endpoint}&page=${page}`);
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        throw new Error(json.error || 'Failed to load options');
+      }
+      return json;
+    };
+
+    const firstPage = await fetchPage(1);
+    const remainingPages = await Promise.all(
+      Array.from({ length: Math.max(0, (firstPage.pagination?.pages || 1) - 1) }, (_, index) =>
+        fetchPage(index + 2)
+      )
+    );
+    return [firstPage, ...remainingPages].flatMap((result) => result.data || []);
+  };
+
+  useEffect(() => {
+    if (!addingVisit) return;
+
+    let cancelled = false;
+    setLoadingOptions(true);
+    Promise.all([
+      fetchAllOptions('/api/leads?limit=200'),
+      fetchAllOptions('/api/properties?status=available&limit=200'),
+    ])
+      .then(([leads, properties]) => {
+        if (!cancelled) {
+          setLeadOptions(leads);
+          setPropertyOptions(properties);
+        }
+      })
+      .catch((error) => {
+        console.error('[site-visits] option fetch error:', error);
+        if (!cancelled) toast.error(error.message || 'Failed to load leads and properties');
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingOptions(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [addingVisit]);
 
   const fetchStats = async () => {
     try {
@@ -131,6 +185,48 @@ export default function SiteVisitsPage() {
     }
   };
 
+  const handleAddVisit = async (event) => {
+    event.preventDefault();
+    const visitDate = new Date(`${newVisit.date}T${newVisit.time}`);
+    if (!Number.isFinite(visitDate.getTime())) {
+      toast.error('Select a valid date and time');
+      return;
+    }
+
+    setSavingNewVisit(true);
+    try {
+      const response = await fetch('/api/site-visits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: newVisit.leadId,
+          propertyId: newVisit.propertyId,
+          scheduledDate: visitDate.toISOString(),
+          scheduledTime: visitDate.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          }),
+        }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok || !json.success) {
+        throw new Error(json.error || 'Failed to add site visit');
+      }
+
+      toast.success('Site visit added');
+      setAddingVisit(false);
+      setNewVisit({ leadId: '', propertyId: '', date: '', time: '' });
+      fetchVisits();
+      fetchStats();
+    } catch (error) {
+      console.error('[site-visits] create error:', error);
+      toast.error(error.message || 'Failed to add site visit');
+    } finally {
+      setSavingNewVisit(false);
+    }
+  };
+
   const isMachineDateTime = (value) =>
     typeof value === 'string' &&
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value);
@@ -174,10 +270,14 @@ export default function SiteVisitsPage() {
               Track and manage all property site visits
             </p>
           </div>
-          <span className="text-xs bg-white px-4 py-2 rounded-full border border-[#e8f0e6] text-[#4f6b4f] shadow-sm flex items-center gap-2 w-fit">
-            <Calendar className="w-3.5 h-3.5 text-[#2d7a3a]" />
-            {stats.total} Total Site Visits
-          </span>
+          <button
+            type="button"
+            onClick={() => setAddingVisit(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-[#2d7a3a] hover:bg-[#23682e] rounded-xl shadow-sm transition-colors w-fit"
+          >
+            <Plus className="w-4 h-4" />
+            Add Site Visit
+          </button>
         </div>
       </div>
 
@@ -515,6 +615,110 @@ export default function SiteVisitsPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {addingVisit && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)' }}
+          onClick={() => !savingNewVisit && setAddingVisit(false)}
+        >
+          <form
+            onSubmit={handleAddVisit}
+            className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-[480px] max-h-[90vh] overflow-y-auto"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="px-5 sm:px-6 py-4 border-b border-[#e8f0e6] bg-[#fafffa] flex items-center justify-between rounded-t-2xl sticky top-0 z-10">
+              <h3 className="text-base font-semibold text-[#1a2e1a]">Add Manual Site Visit</h3>
+              <button
+                type="button"
+                onClick={() => setAddingVisit(false)}
+                disabled={savingNewVisit}
+                aria-label="Close"
+                className="text-[#6a7f6a] hover:text-[#1a2e1a] text-xl leading-none px-2 disabled:opacity-50"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-6 space-y-4">
+              <Field label="Lead Name">
+                <select
+                  required
+                  value={newVisit.leadId}
+                  onChange={(event) => setNewVisit((current) => ({ ...current, leadId: event.target.value }))}
+                  disabled={loadingOptions || savingNewVisit}
+                  className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a] disabled:opacity-60"
+                >
+                  <option value="">{loadingOptions ? 'Loading leads...' : 'Select a lead'}</option>
+                  {leadOptions.map((lead) => (
+                    <option key={lead._id} value={lead._id}>
+                      {lead.name || 'Unnamed lead'}{lead.phone ? ` · ${lead.phone}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Property">
+                <select
+                  required
+                  value={newVisit.propertyId}
+                  onChange={(event) => setNewVisit((current) => ({ ...current, propertyId: event.target.value }))}
+                  disabled={loadingOptions || savingNewVisit}
+                  className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a] disabled:opacity-60"
+                >
+                  <option value="">{loadingOptions ? 'Loading properties...' : 'Select a property'}</option>
+                  {propertyOptions.map((property) => (
+                    <option key={property._id} value={property._id}>
+                      {property.title}{property.propertyId ? ` · ${property.propertyId}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Date">
+                  <input
+                    type="date"
+                    required
+                    value={newVisit.date}
+                    onChange={(event) => setNewVisit((current) => ({ ...current, date: event.target.value }))}
+                    disabled={savingNewVisit}
+                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
+                  />
+                </Field>
+                <Field label="Time">
+                  <input
+                    type="time"
+                    required
+                    value={newVisit.time}
+                    onChange={(event) => setNewVisit((current) => ({ ...current, time: event.target.value }))}
+                    disabled={savingNewVisit}
+                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="px-5 sm:px-6 py-4 border-t border-[#e8f0e6] flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setAddingVisit(false)}
+                disabled={savingNewVisit}
+                className="w-full sm:w-auto px-4 py-2 text-sm text-[#4f6b4f] hover:bg-[#f0f7ef] rounded-xl transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingNewVisit || loadingOptions}
+                className="w-full sm:w-auto px-4 py-2 bg-[#2d7a3a] hover:bg-[#23682e] text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-60"
+              >
+                {savingNewVisit ? 'Saving...' : 'Save Site Visit'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

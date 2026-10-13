@@ -10,6 +10,10 @@ function escapeRegex(str) {
   return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function isValidObjectId(id) {
+  return typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id);
+}
+
 function startOfDay(d = new Date()) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -66,7 +70,7 @@ export async function GET(request) {
 
     const [visits, total] = await Promise.all([
       SiteVisit.find(query)
-        .sort({ scheduledDate: -1, createdAt: -1 })
+        .sort({ scheduledDate: 1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -90,14 +94,36 @@ export async function GET(request) {
 // ---- POST /api/site-visits ----
 export async function POST(request) {
   try {
+    const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const session = verifySessionToken(token);
+    if (!session || !['owner', 'channel_partner'].includes(session.role)) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
     if (!isDbConnected()) {
       const conn = await dbConnect();
       if (!conn) return NextResponse.json({ error: 'DB unavailable' }, { status: 503 });
     }
 
     const body = await request.json();
-    if (!body.leadId || !body.propertyId || !body.scheduledDate) {
-      return NextResponse.json({ error: 'leadId, propertyId, scheduledDate are required' }, { status: 400 });
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+    if (
+      !isValidObjectId(body.leadId) ||
+      !isValidObjectId(body.propertyId) ||
+      !body.scheduledDate ||
+      typeof body.scheduledTime !== 'string' ||
+      !body.scheduledTime.trim()
+    ) {
+      return NextResponse.json(
+        { error: 'Valid leadId, propertyId, scheduledDate, and scheduledTime are required' },
+        { status: 400 }
+      );
+    }
+    const scheduledDate = new Date(body.scheduledDate);
+    if (!Number.isFinite(scheduledDate.getTime()) || !body.scheduledTime) {
+      return NextResponse.json({ error: 'A valid date and time are required' }, { status: 400 });
     }
 
     const [lead, property] = await Promise.all([
@@ -107,6 +133,13 @@ export async function POST(request) {
     if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
     if (!property) return NextResponse.json({ error: 'Property not found' }, { status: 404 });
 
+    if (
+      session.role === 'channel_partner' &&
+      (!session.name || lead.assignedTo?.trim().toLowerCase() !== session.name.trim().toLowerCase())
+    ) {
+      return NextResponse.json({ error: 'You can only add visits for leads assigned to you' }, { status: 403 });
+    }
+
     const visit = await SiteVisit.create({
       lead: lead._id,
       property: property._id,
@@ -114,23 +147,20 @@ export async function POST(request) {
       leadPhone: lead.phone || '',
       propertyTitle: property.title || '',
       propertyCode: property.propertyId || '',
-      scheduledDate: new Date(body.scheduledDate),
-      scheduledTime: body.scheduledTime || '',
-      rawPreferredDateTime: body.rawPreferredDateTime || '',
-      channelPartnerName: body.channelPartnerName || '',
-      status: body.status || 'scheduled',
-      notes: body.notes || '',
-      source: body.source || 'admin',
+      scheduledDate,
+      scheduledTime: body.scheduledTime,
+      channelPartnerName: lead.assignedTo || '',
+      status: 'scheduled',
+      source: 'manual',
     });
 
-    if (visit.status === 'completed') {
-      await Lead.findByIdAndUpdate(lead._id, {
-        $set: {
-          currentStatus: 'site_visit_completed',
-          lastActivityAt: new Date(),
-        },
-      });
-    }
+    await Lead.findByIdAndUpdate(lead._id, {
+      $set: {
+        activeSiteVisit: visit._id,
+        currentStatus: 'site_visit_scheduled',
+        lastActivityAt: new Date(),
+      },
+    });
 
     await logActivity(request, {
       action: 'site_visit.created',

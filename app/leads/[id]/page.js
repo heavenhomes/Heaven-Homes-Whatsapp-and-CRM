@@ -447,7 +447,7 @@ function InterestedTab({ interests, selectedProperty, onOpenGallery }) {
         return (
           <div
             key={it._id || `int-${idx}`}
-            className="min-w-0 overflow-hidden border border-[#eef5ec] rounded-xl p-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[#fafffa] transition-colors"
+            className="min-w-0 overflow-hidden bg-white shadow-sm md:bg-transparent md:shadow-none border border-[#eef5ec] rounded-xl p-3 flex flex-col md:flex-row md:items-center gap-3 hover:bg-[#fafffa] transition-colors"
           >
             {image ? (
               <button
@@ -457,25 +457,39 @@ function InterestedTab({ interests, selectedProperty, onOpenGallery }) {
                   imageUrl: image,
                   images: galleryImages,
                 })}
-                className="w-full h-40 md:w-20 md:h-20 flex-shrink-0 rounded-xl bg-[#f0f7ef] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]"
+                className="relative block overflow-hidden w-full md:w-20 md:h-20 flex-shrink-0 rounded-xl bg-[#f0f7ef] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]"
                 aria-label={`View images for ${publicTitle}`}
               >
+                {/* mobile only: blurred copy fills the empty bars around the full image */}
+                <img
+                  src={image}
+                  alt=""
+                  aria-hidden="true"
+                  className="md:hidden absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
+                />
                 <img
                   src={image}
                   alt={publicTitle}
-                  className="block w-full h-full rounded-xl object-contain border border-[#eef5ec]"
+                  loading="lazy"
+                  className="relative block w-full h-auto max-h-[75vh] object-contain rounded-xl md:absolute md:inset-0 md:h-full md:max-h-none md:border md:border-[#eef5ec]"
                 />
+                {galleryImages.length > 1 && (
+                  <span className="md:hidden absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white">
+                    <ImageIcon className="w-3 h-3" />
+                    {galleryImages.length}
+                  </span>
+                )}
               </button>
             ) : (
-              <div className="w-full h-40 md:w-20 md:h-20 rounded-xl bg-[#f0f7ef] flex items-center justify-center flex-shrink-0 border border-[#eef5ec]">
+              <div className="w-full aspect-[4/3] md:aspect-auto md:w-20 md:h-20 rounded-xl bg-[#f0f7ef] flex items-center justify-center flex-shrink-0 border border-[#eef5ec]">
                 <ImageIcon className="w-6 h-6 text-[#6a7f6a]" />
               </div>
             )}
 
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <Star className="w-3.5 h-3.5 text-[#f59e0b] fill-[#f59e0b] flex-shrink-0" />
-                <span className="text-sm font-medium text-[#1a2e1a] truncate">
+              <div className="flex items-start md:items-center gap-2 mb-1">
+                <Star className="w-3.5 h-3.5 mt-0.5 md:mt-0 text-[#f59e0b] fill-[#f59e0b] flex-shrink-0" />
+                <span className="text-sm font-medium text-[#1a2e1a] break-words md:truncate">
                   {publicTitle}
                 </span>
               </div>
@@ -510,7 +524,7 @@ function InterestedTab({ interests, selectedProperty, onOpenGallery }) {
             </div>
 
             <div className="text-left md:text-right md:flex-shrink-0">
-              <p className="text-sm font-semibold text-[#2d7a3a]">
+              <p className="text-base md:text-sm font-semibold text-[#2d7a3a]">
                 ₹{Number(price).toLocaleString('en-IN')}
               </p>
             </div>

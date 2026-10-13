@@ -102,8 +102,10 @@ body.modal-open {
   overflow: hidden;
 }
 
-/* Fluid images */
-img {
-  max-width: 100%;
-  height: auto;
+/* Fluid images (in @layer base so Tailwind utilities like h-full / object-contain can override it) */
+@layer base {
+  img {
+    max-width: 100%;
+    height: auto;
+  }
 }

@@ -168,7 +168,8 @@ const SPACE_SIZE_OPTIONS = [
 ];
 
 export default function LeadsPage() {
-  const { isOwner } = useAuth();
+  const { user, isOwner } = useAuth();
+  const isChannelPartner = user?.role === "channel_partner";
   const router = useRouter();
   const [leads, setLeads] = useState([]);
   const [stats, setStats] = useState({
@@ -315,19 +316,18 @@ export default function LeadsPage() {
     let cancelled = false;
     const loadManualLeadOptions = async () => {
       try {
-        const [propertyResponse, teamResponse] = await Promise.all([
-          fetch('/api/properties?city=Surat&limit=200'),
-          fetch('/api/team-members?role=channel_partner&active=true&limit=500'),
-        ]);
-        const [propertyJson, teamJson] = await Promise.all([
-          propertyResponse.json(),
-          teamResponse.json(),
-        ]);
+        const propertyResponse = await fetch('/api/properties?city=Surat&limit=200');
+        const propertyJson = await propertyResponse.json();
         if (!propertyResponse.ok || !propertyJson.success) {
           throw new Error(propertyJson.error || 'Could not load Surat areas');
         }
-        if (!teamResponse.ok || !teamJson.success) {
-          throw new Error(teamJson.error || 'Could not load lead assignees');
+        let teamJson = { data: [] };
+        if (isOwner) {
+          const teamResponse = await fetch('/api/team-members?role=channel_partner&active=true&limit=500');
+          teamJson = await teamResponse.json();
+          if (!teamResponse.ok || !teamJson.success) {
+            throw new Error(teamJson.error || 'Could not load lead assignees');
+          }
         }
         if (cancelled) return;
         setAreaOptions(
@@ -335,6 +335,9 @@ export default function LeadsPage() {
             .sort((a, b) => a.localeCompare(b))
         );
         setAssigneeOptions((teamJson.data || []).map((member) => member.name).filter(Boolean));
+        if (!isOwner && user?.name) {
+          setForm((previous) => ({ ...previous, assignedTo: user.name }));
+        }
       } catch (error) {
         if (!cancelled) {
           console.error('Failed to load manual lead options:', error);
@@ -347,7 +350,7 @@ export default function LeadsPage() {
     return () => {
       cancelled = true;
     };
-  }, [addOpen]);
+  }, [addOpen, isOwner, user?.name]);
 
   useEffect(() => {
     setForm((previous) => previous.interested
@@ -537,7 +540,7 @@ export default function LeadsPage() {
       interested: "",
       spaceSize: "",
       currentStatus: "new",
-      assignedTo: "",
+      assignedTo: isOwner ? "" : user?.name || "",
     });
     setAddOpen(true);
   };
@@ -794,15 +797,17 @@ export default function LeadsPage() {
             </p>
           </div>
 
-          {isOwner && (
+          {(isOwner || isChannelPartner) && (
             <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
-              <button
-                onClick={handleExport}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white hover:bg-[#f0f7ef] text-[#2d7a3a] border border-[#c9e5c3] px-4 py-2.5 rounded-xl text-sm font-medium transition-all shadow-sm hover:shadow-md"
-              >
-                <Download className="w-4 h-4" />
-                Export to Excel
-              </button>
+              {isOwner && (
+                <button
+                  onClick={handleExport}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white hover:bg-[#f0f7ef] text-[#2d7a3a] border border-[#c9e5c3] px-4 py-2.5 rounded-xl text-sm font-medium transition-all shadow-sm hover:shadow-md"
+                >
+                  <Download className="w-4 h-4" />
+                  Export to Excel
+                </button>
+              )}
               <button
                 onClick={openAddModal}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#2d7a3a] hover:bg-[#23682e] text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all shadow-sm hover:shadow-md"
@@ -1300,16 +1305,26 @@ export default function LeadsPage() {
                   />
                 </Field>
                 )}
-                <Field label="Assigned To">
-                  <select
-                    value={form.assignedTo}
-                    onChange={(e) => setForm((p) => ({ ...p, assignedTo: e.target.value }))}
-                    className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
-                  >
-                    <option value="">Unassigned</option>
-                    {assigneeOptions.map((name) => <option key={name} value={name}>{name}</option>)}
-                  </select>
-                </Field>
+                {isOwner ? (
+                  <Field label="Assigned To">
+                    <select
+                      value={form.assignedTo}
+                      onChange={(e) => setForm((p) => ({ ...p, assignedTo: e.target.value }))}
+                      className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-[#fafffa] focus:outline-none focus:ring-2 focus:ring-[#2d7a3a]/20 focus:border-[#2d7a3a]"
+                    >
+                      <option value="">Unassigned</option>
+                      {assigneeOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+                    </select>
+                  </Field>
+                ) : (
+                  <Field label="Assigned To">
+                    <input
+                      value={user?.name || ""}
+                      readOnly
+                      className="w-full px-3 py-2 border border-[#e8f0e6] rounded-xl text-sm bg-gray-100 text-gray-600"
+                    />
+                  </Field>
+                )}
                 <Field label="Current Status">
                   <select
                     value={form.currentStatus}

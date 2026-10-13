@@ -132,7 +132,21 @@ export async function POST(request) {
       if (!conn) return NextResponse.json({ error: 'DB unavailable' }, { status: 503 });
     }
 
+    const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const session = verifySessionToken(token);
+    if (!session || !['owner', 'channel_partner'].includes(session.role)) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+    const isOwner = session.role === 'owner';
+
     const body = await request.json();
+    if (!isOwner && body.source !== 'manual') {
+      return NextResponse.json(
+        { error: 'Channel partners can only create manual leads' },
+        { status: 403 }
+      );
+    }
+
     const phone = String(body.phone || '').trim();
     if (!phone) {
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
@@ -141,6 +155,13 @@ export async function POST(request) {
     const cleanBody = {};
     for (const key of ALLOWED_LEAD_FIELDS) {
       if (key !== 'phone' && body[key] !== undefined) cleanBody[key] = body[key];
+    }
+    if (!isOwner) {
+      if (!session.name) {
+        return NextResponse.json({ error: 'Channel partner name is missing from session' }, { status: 403 });
+      }
+      cleanBody.source = 'manual';
+      cleanBody.assignedTo = session.name;
     }
     if (!cleanBody.interested) delete cleanBody.interested;
     if (body.source === 'manual') {
@@ -176,7 +197,13 @@ export async function POST(request) {
       cleanBody.step = 'completed';
     }
 
-    const existingLead = await Lead.findOne({ phone }).select('_id').lean();
+    const existingLead = await Lead.findOne({ phone }).select('_id assignedTo').lean();
+    if (!isOwner && existingLead && existingLead.assignedTo !== session.name) {
+      return NextResponse.json(
+        { error: 'A lead with this phone number already exists and is not assigned to you' },
+        { status: 409 }
+      );
+    }
     const update = {
       $set: cleanBody,
       $setOnInsert: { phone },

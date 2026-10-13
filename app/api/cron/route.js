@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { checkAndSendFollowUps } from '@/lib/followup-service';
+import { checkAndSendSiteVisitReminders } from '@/lib/site-visit-reminder-service';
 
 export async function GET(request) {
   const authHeader = request.headers.get('authorization');
@@ -13,16 +14,18 @@ export async function GET(request) {
   try {
     console.log('🔄 Cron job triggered - Starting follow-up check...');
     const result = await checkAndSendFollowUps();
+    const siteVisitReminders = await checkAndSendSiteVisitReminders();
 
-    if (!result.success) {
-      return NextResponse.json(result, { status: 400 });
+    if (!result.success || !siteVisitReminders.success) {
+      return NextResponse.json({ result, siteVisitReminders }, { status: 400 });
     }
 
     console.log('✅ Cron job completed successfully');
     return NextResponse.json({
       success: true,
-      message: 'Follow-up cron job executed',
+      message: 'Follow-up and site visit reminder checks executed',
       result,
+      siteVisitReminders,
     });
   } catch (error) {
     console.error('❌ Cron job error:', error);

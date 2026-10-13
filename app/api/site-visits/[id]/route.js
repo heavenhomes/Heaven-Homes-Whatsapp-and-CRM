@@ -44,11 +44,13 @@ export async function PUT(request, { params }) {
       );
 
     // If the date changed and the status is now 'rescheduled', capture the old
-    if (
-      clean.scheduledDate &&
-      new Date(clean.scheduledDate).getTime() !==
-        new Date(existing.scheduledDate).getTime()
-    ) {
+    const scheduleChanged =
+      (clean.scheduledDate &&
+        new Date(clean.scheduledDate).getTime() !==
+          new Date(existing.scheduledDate).getTime()) ||
+      (clean.scheduledTime !== undefined &&
+        clean.scheduledTime !== existing.scheduledTime);
+    if (scheduleChanged) {
       clean.rescheduledFrom = {
         date: existing.scheduledDate,
         time: existing.scheduledTime,
@@ -57,7 +59,10 @@ export async function PUT(request, { params }) {
       if (clean.status === undefined) clean.status = "rescheduled";
     }
 
-    const visit = await SiteVisit.findByIdAndUpdate(id, clean, {
+    const update = scheduleChanged
+      ? { $set: clean, $unset: { reminderSentAt: 1 } }
+      : clean;
+    const visit = await SiteVisit.findByIdAndUpdate(id, update, {
       returnDocument: "after",
       runValidators: true,
     });

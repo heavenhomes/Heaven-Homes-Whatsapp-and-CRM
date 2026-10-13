@@ -1,6 +1,7 @@
 import dbConnect, { isDbConnected } from '@/lib/mongodb';
 import Lead from '@/lib/models/Lead';
 import Property from '@/lib/models/Property';
+import SiteVisit from '@/lib/models/SiteVisit';
 import { generateUniquePropertyId } from '@/lib/property-id';
 import mongoose from 'mongoose';
 import { NextResponse } from 'next/server';
@@ -957,6 +958,15 @@ async function sendPropertyCard(
   property,
   { isFallback = false, lang = 'en', showHeader = true } = {}
 ) {
+  if (showHeader) {
+    const header = t(
+      lang,
+      isFallback ? PROPERTY_CARD_HEADER.fallback : PROPERTY_CARD_HEADER.match
+    );
+    await sendText(phone, header);
+    await waitForPropertyMessage();
+  }
+
   const imageUrls = (property.images || [])
     .map((image) => typeof image === 'string' ? image : image?.url)
     .filter(Boolean);
@@ -972,15 +982,6 @@ async function sendPropertyCard(
   }
 
   await waitForPropertyMessage();
-  if (showHeader) {
-    const header = t(
-      lang,
-      isFallback ? PROPERTY_CARD_HEADER.fallback : PROPERTY_CARD_HEADER.match
-    );
-    await sendText(phone, header);
-    await waitForPropertyMessage();
-  }
-
   await sendText(phone, propertyCardCaption(property, lang));
 }
 
@@ -1957,7 +1958,7 @@ async function resolveOptions(step, lead) {
   return step.options;
 }
 
-async function sendStepPrompt(phone, stepId, step, lead) {
+async function sendStepPrompt(phone, stepId, step, lead, { showPropertyHeader = true } = {}) {
   const lang = lead.preferredLanguage || 'en';
   const promptTri = typeof step.prompt === 'function' ? step.prompt(lead) : step.prompt;
 
@@ -2016,7 +2017,7 @@ async function sendStepPrompt(phone, stepId, step, lead) {
     await sendPropertyCard(phone, showingPropertyCtx.property, {
       isFallback: !lead.hadExactMatch,
       lang,
-      showHeader: !lead.propertyIdSearch,
+      showHeader: showPropertyHeader && !lead.propertyIdSearch,
     });
 
     await waitForPropertyMessage();
@@ -2265,6 +2266,7 @@ async function handleMessage(phone, incoming) {
       phone,
       step: 'askLanguage',
       lastIncomingMessageId: incoming.wamid || '',
+      lastInboundMessageAt: new Date(),
       currentStatus: 'new',
     });
     if (incoming.type === 'text') {
@@ -2286,7 +2288,13 @@ async function handleMessage(phone, incoming) {
   if (incoming.wamid) {
     const updated = await Lead.findOneAndUpdate(
       { _id: lead._id, lastIncomingMessageId: { $ne: incoming.wamid } },
-      { $set: { lastIncomingMessageId: incoming.wamid } },
+      {
+        $set: {
+          lastIncomingMessageId: incoming.wamid,
+          lastInboundMessageAt: new Date(),
+          lastActivityAt: new Date(),
+        },
+      },
       { returnDocument: 'after' }
     );
     if (!updated) {
@@ -2316,6 +2324,118 @@ async function handleMessage(phone, incoming) {
       type: 'image',
       mediaId: incoming.mediaId,
     });
+  }
+  lead.lastInboundMessageAt = new Date();
+  touchLeadActivity(lead);
+
+  const siteVisitAction = interactiveId?.match(
+    /^site_visit_(confirm|reschedule|cancel)::([a-f\d]{24})$/i
+  );
+  if (siteVisitAction) {
+    const [, action, siteVisitId] = siteVisitAction;
+    const visit = await SiteVisit.findOne({
+      _id: siteVisitId,
+      lead: lead._id,
+      status: { $in: ['scheduled', 'pending', 'rescheduled'] },
+    });
+
+    if (!visit) {
+      const message = 'This site visit is no longer active. Please contact our team if you need help.';
+      pushConversation(lead, { direction: 'out', type: 'text', text: message });
+      await lead.save();
+      await sendText(phone, message);
+      return;
+    }
+
+    const visitDate = visit.scheduledDate.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+    const visitTime = visit.scheduledTime || visit.scheduledDate.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata',
+    });
+    const customerName = lead.name?.trim() || 'there';
+
+    if (action === 'confirm') {
+      const message = `✅ Site Visit Confirmed!\n\nThank you, ${customerName}! 😊 Your site visit has been confirmed successfully. 🏡\n\n🏡 Property: ${visit.propertyTitle}\n📅 Date: ${visitDate}\n⏰ Time: ${visitTime}\n\nWe look forward to seeing you! 🏡`;
+      pushConversation(lead, { direction: 'out', type: 'text', text: message });
+      await lead.save();
+      await sendText(phone, message);
+      return;
+    }
+
+    if (action === 'reschedule') {
+      lead.activeSiteVisit = visit._id;
+      lead.step = 'rescheduleSiteVisit';
+      const message = `🔄 Reschedule Your Site Visit\n\nNo problem, ${customerName}! 😊\n📅 Please enter your preferred new date and time for the site visit.\nExample: 15 October 2026, 4:00 PM`;
+      pushConversation(lead, { direction: 'out', type: 'text', text: message });
+      await lead.save();
+      await sendText(phone, message);
+      return;
+    }
+
+    visit.status = 'cancelled';
+    await visit.save();
+    lead.activeSiteVisit = undefined;
+    const message = `❌ Site Visit Cancelled Successfully\n\nHello, ${customerName}! Your site visit for ${visit.propertyTitle} has been cancelled successfully. If you'd like to explore other properties or schedule a new visit, we're happy to help. 😊`;
+    await sendTerminalMessage(phone, lead, message, 'siteVisitCancelled', [
+      { id: 'main_menu', title: '🏠 Main Menu' },
+    ]);
+    return;
+  }
+
+  if (lead.step === 'rescheduleSiteVisit') {
+    const datePattern = /\b\d{1,2}\s*(?:st|nd|rd|th)?\s+[a-z]+\b|\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b(?:today|tomorrow|day after tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
+    const timePattern = /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b|\b\d{1,2}:\d{2}\b/i;
+    if (!datePattern.test(text) || !timePattern.test(text)) {
+      const message = 'Please enter both a date and time. Example: 15 October 2026, 4:00 PM';
+      pushConversation(lead, { direction: 'out', type: 'text', text: message });
+      await lead.save();
+      await sendText(phone, message);
+      return;
+    }
+
+    const visit = await SiteVisit.findOne({
+      _id: lead.activeSiteVisit,
+      lead: lead._id,
+      status: { $in: ['scheduled', 'pending', 'rescheduled'] },
+    });
+    if (!visit) {
+      lead.activeSiteVisit = undefined;
+      lead.step = 'completed';
+      const message = 'This site visit is no longer active. Please contact our team if you need help.';
+      pushConversation(lead, { direction: 'out', type: 'text', text: message });
+      await lead.save();
+      await sendText(phone, message);
+      return;
+    }
+
+    const parsed = parseVisitDateTime(text);
+    visit.rescheduledFrom = {
+      date: visit.scheduledDate,
+      time: visit.scheduledTime,
+      rescheduledAt: new Date(),
+    };
+    visit.scheduledDate = parsed.date;
+    visit.scheduledTime = parsed.time;
+    visit.rawPreferredDateTime = text.trim();
+    visit.status = 'rescheduled';
+    visit.reminderSentAt = undefined;
+    await visit.save();
+
+    lead.siteVisit = text.trim();
+    lead.activeSiteVisit = undefined;
+    lead.step = 'completed';
+    const message = `✅ Site Visit Rescheduled!\n\n🏡 Property: ${visit.propertyTitle}\n📅 Date: ${visit.scheduledDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}\n⏰ Time: ${visit.scheduledTime}`;
+    pushConversation(lead, { direction: 'out', type: 'text', text: message });
+    await lead.save();
+    await sendText(phone, message);
+    return;
   }
 
   if (isStopFollowUpAction(interactiveId, text)) {
@@ -2356,18 +2476,6 @@ async function handleMessage(phone, incoming) {
     pushStatusChange(lead, 'active', 'whatsapp_bot', 'Returned to main menu');
     await lead.save();
     await sendStepPrompt(phone, 'askSearchMode', STEPS.askSearchMode, lead);
-    return;
-  }
-
-  if (interactiveId === 'fu_show_properties') {
-    touchLeadActivity(lead);
-    const properties = await findMatchingProperties(lead);
-    lead.matchedProperties = properties.map((property) => property._id);
-    lead.currentPropertyIndex = 0;
-    lead.propertyIdSearch = false;
-    lead.step = properties.length ? 'showing_property' : 'askSearchMode';
-    await lead.save();
-    await sendStepPrompt(phone, lead.step, STEPS[lead.step], lead);
     return;
   }
 

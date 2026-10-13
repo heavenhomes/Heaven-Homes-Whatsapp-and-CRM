@@ -31,6 +31,7 @@ const STATUS_FILTER_OPTIONS = [
   { value: "interested", label: "Interested" },
   { value: "site_visit_scheduled", label: "Visit Scheduled" },
   { value: "site_visit_completed", label: "Visit Done" },
+  { value: "re_visit", label: "Re-visit" },
   { value: "lost", label: "Lost" },
   { value: "converted", label: "Converted" },
 ];
@@ -145,8 +146,12 @@ const RENT_OUT_AVAILABILITY = [
   ["next_month", "🗓️ Next Month"],
 ];
 const BUYING_PLANS = [
-  ["buy_directly", "Buy Directly"],
-  ["sell_then_buy", "Sell Then Buy"],
+  ["immediately", "Immediately"],
+  ["within_1_month", "Within 1 month"],
+  ["1_3_months", "1–3 months"],
+  ["3_6_months", "3–6 months"],
+  ["just_exploring", "Just exploring"],
+  ["sell_existing_first", "Need to sell my existing property first"],
 ];
 const FURNISHING_OPTIONS = [
   ["unfurnished", "Unfurnished"],
@@ -730,6 +735,10 @@ export default function LeadsPage() {
       pillClass: "status-site-visit-completed",
       label: "Visit Done",
     },
+    re_visit: {
+      pillClass: "status-site-visit-scheduled",
+      label: "Re-visit",
+    },
     lost: { pillClass: "status-lost", label: "Lost" },
     converted: { pillClass: "status-converted", label: "Converted" },
   };
@@ -772,6 +781,8 @@ export default function LeadsPage() {
       visit_completed: "site_visit_completed",
       visitcompleted: "site_visit_completed",
       visit_done: "site_visit_completed",
+      re_visit: "re_visit",
+      revisit: "re_visit",
       not_interested: "lost",
       notinterested: "lost",
       lost: "lost",

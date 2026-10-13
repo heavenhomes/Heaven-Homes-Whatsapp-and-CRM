@@ -18,6 +18,7 @@ const STATUS_OPTIONS = [
   { value: 'interested', label: 'Interested', tone: 'bg-[#f3e8ff] text-[#7a3aa8]', dot: 'bg-[#7a3aa8]' },
   { value: 'site_visit_scheduled', label: 'Site Visit Scheduled', tone: 'bg-[#fef3c7] text-[#b45309]', dot: 'bg-[#b45309]' },
   { value: 'site_visit_completed', label: 'Site Visit Completed', tone: 'bg-[#dcfce7] text-[#15803d]', dot: 'bg-[#15803d]' },
+  { value: 're_visit', label: 'Re-visit', tone: 'bg-[#fef3c7] text-[#b45309]', dot: 'bg-[#b45309]' },
   { value: 'lost', label: 'Lost', tone: 'bg-[#fde8e8] text-[#c0392b]', dot: 'bg-[#c0392b]' },
   { value: 'converted', label: 'Converted', tone: 'bg-[#e8f5e6] text-[#2d7a3a]', dot: 'bg-[#2d7a3a]' },
 ];

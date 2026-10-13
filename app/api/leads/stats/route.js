@@ -3,6 +3,10 @@ import Lead from '@/lib/models/Lead';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth/session';
 import { NextResponse } from 'next/server';
 
+function escapeRegex(str) {
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export async function GET(request) {
   try {
     if (!isDbConnected()) {
@@ -18,7 +22,10 @@ export async function GET(request) {
     // Channel partners only see their own leads — every count is scoped
     const scope = {};
     if (!isOwner && session?.name) {
-      scope.assignedTo = session.name;
+      scope.assignedTo = {
+        $regex: `^\\s*${escapeRegex(session.name.trim())}\\s*$`,
+        $options: 'i',
+      };
     }
 
     const [
@@ -40,7 +47,7 @@ export async function GET(request) {
       Lead.countDocuments({
         ...scope,
         currentStatus: {
-          $in: ['active', 'contacted', 'interested', 'site_visit_scheduled', 'site_visit_completed'],
+          $in: ['active', 'contacted', 'interested', 'site_visit_scheduled', 'site_visit_completed', 're_visit'],
         },
       }),
       Lead.countDocuments({ ...scope, currentStatus: 'converted' }),

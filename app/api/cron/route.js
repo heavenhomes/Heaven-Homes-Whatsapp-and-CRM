@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { checkAndSendFollowUps } from '@/lib/followup-service';
-import { checkAndSendSiteVisitReminders } from '@/lib/site-visit-reminder-service';
+import {
+  checkAndSendSiteVisitReminders,
+  markPastSiteVisitsPending,
+} from '@/lib/site-visit-reminder-service';
 
 export async function GET(request) {
   const authHeader = request.headers.get('authorization');
@@ -14,10 +17,11 @@ export async function GET(request) {
   try {
     console.log('🔄 Cron job triggered - Starting follow-up check...');
     const result = await checkAndSendFollowUps();
+    const siteVisitStatusUpdates = await markPastSiteVisitsPending();
     const siteVisitReminders = await checkAndSendSiteVisitReminders();
 
-    if (!result.success || !siteVisitReminders.success) {
-      return NextResponse.json({ result, siteVisitReminders }, { status: 400 });
+    if (!result.success || !siteVisitStatusUpdates.success || !siteVisitReminders.success) {
+      return NextResponse.json({ result, siteVisitStatusUpdates, siteVisitReminders }, { status: 400 });
     }
 
     console.log('✅ Cron job completed successfully');
@@ -25,6 +29,7 @@ export async function GET(request) {
       success: true,
       message: 'Follow-up and site visit reminder checks executed',
       result,
+      siteVisitStatusUpdates,
       siteVisitReminders,
     });
   } catch (error) {

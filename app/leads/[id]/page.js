@@ -25,6 +25,7 @@ const CRM_STATUSES = [
   { value: 'interested', label: 'Interested' },
   { value: 'site_visit_scheduled', label: 'Site Visit Scheduled' },
   { value: 'site_visit_completed', label: 'Site Visit Completed' },
+  { value: 're_visit', label: 'Re-visit' },
   { value: 'lost', label: 'Lost' },
   { value: 'converted', label: 'Converted' },
 ];
@@ -385,11 +386,16 @@ function EnquiryTab({ enquiries }) {
             {e.buyingPlan && (
               <Detail
                 label="Buying Plan"
-                value={
-                  e.buyingPlan === 'sell_then_buy'
-                    ? 'First sell then buy'
-                    : 'Directly buy'
-                }
+                value={{
+                  immediately: 'Immediately',
+                  within_1_month: 'Within 1 month',
+                  '1_3_months': '1–3 months',
+                  '3_6_months': '3–6 months',
+                  just_exploring: 'Just exploring',
+                  sell_existing_first: 'Need to sell my existing property first',
+                  buy_directly: 'Directly buy',
+                  sell_then_buy: 'First sell then buy',
+                }[e.buyingPlan] || e.buyingPlan.replace(/_/g, ' ')}
               />
             )}
             {e.furnishing && (

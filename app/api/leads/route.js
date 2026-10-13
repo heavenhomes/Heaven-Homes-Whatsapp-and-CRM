@@ -50,7 +50,10 @@ export async function GET(request) {
 
     // Channel partners only see leads assigned to them
     if (!isOwner && session?.name) {
-      query.assignedTo = session.name;
+      query.assignedTo = {
+        $regex: `^\\s*${escapeRegex(session.name.trim())}\\s*$`,
+        $options: 'i',
+      };
     }
 
     if (status === 'completed') query.step = 'completed';
@@ -162,6 +165,8 @@ export async function POST(request) {
       }
       cleanBody.source = 'manual';
       cleanBody.assignedTo = session.name;
+    } else if (cleanBody.assignedTo !== undefined) {
+      cleanBody.assignedTo = String(cleanBody.assignedTo).trim();
     }
     if (!cleanBody.interested) delete cleanBody.interested;
     if (body.source === 'manual') {

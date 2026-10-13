@@ -66,7 +66,7 @@ export async function GET(request) {
 
     const [visits, total] = await Promise.all([
       SiteVisit.find(query)
-        .sort({ scheduledDate: 1, createdAt: -1 })
+        .sort({ scheduledDate: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),

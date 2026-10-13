@@ -1508,15 +1508,28 @@ const STEPS = {
   },
 
   askSellFirstOrBuyDirect: {
-    kind: 'buttons',
+    kind: 'list',
     prompt: {
-      en: 'Are you looking to sell one of your properties first and then purchase another property, or are you looking to purchase directly?',
-      hi: 'क्या आप पहले अपनी कोई संपत्ति बेचना चाहते हैं और फिर दूसरी संपत्ति खरीदना चाहते हैं, या सीधे खरीदना चाहते हैं?',
-      gu: 'શું તમે પહેલા તમારી કોઈ પ્રોપર્ટી વેચવા માંગો છો અને પછી બીજી પ્રોપર્ટી ખરીદવા માંગો છો, કે સીધા ખરીદવા માંગો છો?',
+      en: 'When are you planning to buy a property?',
+      hi: 'आप प्रॉपर्टी खरीदने की योजना कब बना रहे हैं?',
+      gu: 'તમે પ્રોપર્ટી ખરીદવાનું ક્યારે વિચારી રહ્યા છો?',
     },
+    listButton: { en: 'Choose', hi: 'चुनें', gu: 'પસંદ કરો' },
     options: [
-      { id: 'buy_directly', title: { en: '🏠 Buy directly', hi: '🏠 सीधे खरीदें', gu: '🏠 સીધા ખરીદો' } },
-      { id: 'sell_then_buy', title: { en: '💰 Sell then Buy', hi: '💰 बेचें फिर खरीदें', gu: '💰 વેચો પછી ખરીદો' } },
+      { id: 'immediately', title: { en: 'Immediately', hi: 'तुरंत', gu: 'તરત' } },
+      { id: 'within_1_month', title: { en: 'Within 1 month', hi: '1 महीने के भीतर', gu: '1 મહિનામાં' } },
+      { id: '1_3_months', title: { en: '1–3 months', hi: '1–3 महीने', gu: '1–3 મહિના' } },
+      { id: '3_6_months', title: { en: '3–6 months', hi: '3–6 महीने', gu: '3–6 મહિના' } },
+      { id: 'just_exploring', title: { en: 'Just exploring', hi: 'अभी जानकारी ले रहा हूँ', gu: 'હાલમાં શોધખોળ કરું છું' } },
+      {
+        id: 'sell_existing_first',
+        title: { en: 'Sell my property first', hi: 'पहले प्रॉपर्टी बेचनी है', gu: 'પહેલા પ્રોપર્ટી વેચવી છે' },
+        description: {
+          en: 'Need to sell my existing property first',
+          hi: 'पहले अपनी मौजूदा प्रॉपर्टी बेचनी है',
+          gu: 'પહેલા મારી હાલની પ્રોપર્ટી વેચવી છે',
+        },
+      },
     ],
     apply: async (lead, value) => {
       lead.investmentType = value;
@@ -2003,6 +2016,9 @@ async function sendStepPrompt(phone, stepId, step, lead, { showPropertyHeader = 
         options: loggedOptions.map((o) => ({
           id: o.id,
           title: typeof o.title === 'object' ? t(lang, o.title) : o.title,
+          ...(o.description
+            ? { description: typeof o.description === 'object' ? t(lang, o.description) : o.description }
+            : {}),
         })),
       },
     });
@@ -2039,7 +2055,11 @@ async function sendStepPrompt(phone, stepId, step, lead, { showPropertyHeader = 
   }
   if (step.kind === 'list') {
     const options = await resolveOptions(step, lead);
-    const rows = options.map((o) => ({ id: o.id, title: t(lang, o.title) }));
+    const rows = options.map((o) => ({
+      id: o.id,
+      title: t(lang, o.title),
+      ...(o.description ? { description: t(lang, o.description) } : {}),
+    }));
     await sendList(phone, t(lang, promptTri), t(lang, step.listButton), rows);
     return;
   }

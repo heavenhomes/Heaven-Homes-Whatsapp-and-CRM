@@ -55,6 +55,16 @@ const formatDate = (dateInput) => {
   });
 };
 
+const formatDateTime = (dateInput) => {
+  if (!dateInput) return '—';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+};
+
 // Format a JS Date to "Sep 28, 2026" (day group label)
 const formatDayLabel = (dateInput) => {
   const d = new Date(dateInput);
@@ -230,6 +240,7 @@ export default function LeadDetailPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           <Field label="Name" value={lead.name} />
           <Field label="Contact Number" value={lead.phone} />
+          <Field label="Preferred Site Visit" value={formatDateTime(lead.siteVisit)} />
           <Field label="Assigned To">
             {lead.assignedTo ? (
               <p className="text-sm font-medium text-[#1a2e1a] break-words">
@@ -735,7 +746,7 @@ function VisitsTab({ visits }) {
                 {formatDate(v.scheduledDate)}
               </td>
               <td className="px-4 py-3 text-sm text-[#4f6b4f]">
-                {formatTime12h(v.scheduledDate)}
+                {v.scheduledTime || formatTime12h(v.scheduledDate)}
               </td>
               <td className="px-4 py-3 text-sm text-[#4f6b4f]">
                 {v.channelPartnerName || '—'}

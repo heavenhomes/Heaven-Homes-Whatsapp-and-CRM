@@ -131,8 +131,14 @@ export default function SiteVisitsPage() {
     }
   };
 
+  const isMachineDateTime = (value) =>
+    typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value);
+
   const renderDateCell = (v) => {
-    if (v.rawPreferredDateTime) return v.rawPreferredDateTime;
+    if (v.rawPreferredDateTime && !isMachineDateTime(v.rawPreferredDateTime)) {
+      return v.rawPreferredDateTime;
+    }
     if (v.scheduledDate)
       return new Date(v.scheduledDate).toLocaleDateString('en-US', {
         weekday: 'short',
@@ -141,6 +147,17 @@ export default function SiteVisitsPage() {
         year: 'numeric',
       });
     return 'N/A';
+  };
+
+  const renderTimeCell = (v) => {
+    if (v.scheduledTime) return v.scheduledTime;
+    if (v.scheduledDate)
+      return new Date(v.scheduledDate).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+    return '—';
   };
 
   return (
@@ -266,9 +283,9 @@ export default function SiteVisitsPage() {
                     </td>
                     <td className="px-5 py-3">
                       <p className="text-sm text-[#4f6b4f]">{renderDateCell(v)}</p>
-                      {!v.rawPreferredDateTime && v.scheduledTime && (
+                      {(!v.rawPreferredDateTime || isMachineDateTime(v.rawPreferredDateTime)) && (
                         <p className="text-xs text-[#6a7f6a] flex items-center gap-1 mt-0.5">
-                          <Clock className="w-3 h-3" /> {v.scheduledTime}
+                          <Clock className="w-3 h-3" /> {renderTimeCell(v)}
                         </p>
                       )}
                     </td>
@@ -354,7 +371,7 @@ export default function SiteVisitsPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-[#6a7f6a] uppercase tracking-wider text-[10px]">Time</p>
-                    <p className="text-[#1a2e1a] mt-0.5 truncate">{v.scheduledTime || '—'}</p>
+                    <p className="text-[#1a2e1a] mt-0.5 truncate">{renderTimeCell(v)}</p>
                   </div>
                 </div>
 

@@ -587,6 +587,7 @@ export default function LeadsPage() {
           ...form,
           city: "Surat",
           phoneNumber: form.phoneNumber.trim() || form.phone.trim(),
+          siteVisit: form.siteVisit ? new Date(form.siteVisit).toISOString() : "",
           source: "manual",
         }),
       });

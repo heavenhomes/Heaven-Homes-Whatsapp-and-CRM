@@ -1,5 +1,6 @@
 import dbConnect, { isDbConnected } from '@/lib/mongodb';
 import Lead from '@/lib/models/Lead';
+import SiteVisit from '@/lib/models/SiteVisit';
 import Property from '@/lib/models/Property';
 import { logActivity } from '@/lib/activity/log';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth/session';
@@ -142,7 +143,16 @@ export async function POST(request) {
     }
     const isOwner = session.role === 'owner';
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Request body must be a JSON object' }, { status: 400 });
+    }
+
     if (!isOwner && body.source !== 'manual') {
       return NextResponse.json(
         { error: 'Channel partners can only create manual leads' },
@@ -200,6 +210,23 @@ export async function POST(request) {
     }
     if (body.source === 'manual' && body.step === undefined) {
       cleanBody.step = 'completed';
+    }
+    if (
+      body.source === 'manual' &&
+      body.siteVisit !== undefined &&
+      body.siteVisit !== null &&
+      body.siteVisit !== '' &&
+      typeof body.siteVisit !== 'string'
+    ) {
+      return NextResponse.json({ error: 'Site visit date must be a string' }, { status: 400 });
+    }
+    const siteVisitInput =
+      body.source === 'manual' && typeof body.siteVisit === 'string'
+        ? body.siteVisit.trim()
+        : '';
+    const manualSiteVisitDate = siteVisitInput ? new Date(siteVisitInput) : null;
+    if (manualSiteVisitDate && Number.isNaN(manualSiteVisitDate.getTime())) {
+      return NextResponse.json({ error: 'Invalid site visit date' }, { status: 400 });
     }
 
     const existingLead = await Lead.findOne({ phone }).select('_id assignedTo').lean();
@@ -259,6 +286,41 @@ export async function POST(request) {
       update,
       { returnDocument: 'after', upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
+
+    if (manualSiteVisitDate) {
+      const property = lead.interested
+        ? await Property.findById(lead.interested).lean()
+        : null;
+      const scheduledDate = manualSiteVisitDate;
+      const visitDateKey = scheduledDate.toISOString();
+
+      await SiteVisit.findOneAndUpdate(
+        {
+          lead: lead._id,
+          source: 'admin',
+          rawPreferredDateTime: visitDateKey,
+        },
+        {
+          $set: {
+            property: property?._id || null,
+            leadName: lead.name || '',
+            leadPhone: lead.phone || '',
+            propertyTitle: property?.title || property?.internalName || 'Property not specified',
+            propertyCode: property?.propertyId || '',
+            scheduledDate,
+            scheduledTime: '',
+            rawPreferredDateTime: visitDateKey,
+            channelPartnerName: lead.assignedTo || '',
+            status: 'scheduled',
+          },
+          $setOnInsert: {
+            lead: lead._id,
+            source: 'admin',
+          },
+        },
+        { upsert: true, new: true, runValidators: true }
+      );
+    }
 
     const isNew = !existingLead;
     if (isNew) {

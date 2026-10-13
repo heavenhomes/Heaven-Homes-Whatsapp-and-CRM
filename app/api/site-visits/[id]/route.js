@@ -1,6 +1,7 @@
 import dbConnect, { isDbConnected } from "@/lib/mongodb";
 import SiteVisit from "@/lib/models/SiteVisit";
 import Lead from "@/lib/models/Lead";
+import { logActivity } from "@/lib/activity/log";
 import { NextResponse } from "next/server";
 
 function isValidObjectId(id) {
@@ -111,12 +112,6 @@ export async function PUT(request, { params }) {
       data: visit,
       message: "Site visit updated",
     });
-
-    return NextResponse.json({
-      success: true,
-      data: visit,
-      message: "Site visit updated",
-    });
   } catch (error) {
     console.error("[site-visits] PUT error:", error);
     return NextResponse.json(
@@ -163,7 +158,6 @@ export async function DELETE(request, { params }) {
       console.error("[site-visits] activity log failed (non-fatal):", logErr);
     }
 
-    return NextResponse.json({ success: true, message: "Site visit deleted" });
     return NextResponse.json({ success: true, message: "Site visit deleted" });
   } catch (error) {
     console.error("[site-visits] DELETE error:", error);
